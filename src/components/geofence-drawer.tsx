@@ -247,8 +247,8 @@ function AreaDrawer({ value, onChange, context = [], tier, wideMode }: Props) {
           {tier === "wide" && value?.type === "polygon" && area < TIER_RULES.wideMinShapeM2 && (
             <span className="font-semibold text-red-700"> (too small: at least {fmtSqMiles(TIER_RULES.wideMinShapeM2)})</span>
           )}
-          {tier === "local" && value?.type === "circle" && area < TIER_RULES.localMinM2 * 0.995 && (
-            <span className="font-semibold text-red-700"> (too small: a circle needs at least a 1.5 km radius)</span>
+          {tier === "local" && area < TIER_RULES.localMinM2 * 0.995 && (
+            <span className="font-semibold text-red-700"> (too small: a Want area needs at least {fmtSqMiles(TIER_RULES.localMinM2)})</span>
           )}
         </p>
       )}

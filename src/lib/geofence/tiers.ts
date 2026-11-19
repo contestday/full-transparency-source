@@ -23,9 +23,9 @@ export const TIER_RULES = {
   /** A named place (town or larger) counts as wide from 10 square miles. */
   wideMinPlaceM2: 10 * SQ_MILE_M2,
   /**
-   * Local circles: at least 1.5 km radius. A circle is centred on a point, likely
-   * near the watcher; drawn shapes and named places have no true centre, so they
-   * have no minimum. Local areas needn't be inside a wide area.
+   * Local areas of every kind (circle, drawn shape, named place): at least 2.7
+   * square miles (a 1.5 km radius circle), so a Want area can never pinpoint a
+   * single place (owner decision, 19 Nov 2026). They needn't be inside a wide area.
    */
   localMinRadiusM: 1_500,
   localMinM2: Math.PI * 1_500 ** 2,
@@ -132,9 +132,14 @@ export function checkAreaRules(input: {
     return;
   }
   // A Want area stands on its own: it can be inside a Wish area, overlap one, or have none.
-  // Only circles have a minimum (a drawn circle is stored as a many-sided shape, a fraction smaller).
-  if (isCircle && areaM2 < TIER_RULES.localMinM2 * 0.995) {
-    throw new TierRuleError("A Want circle must have a radius of at least 1.5 km. Make it bigger, or draw a shape or search a named place instead.");
+  // Every Want area is at least 2.7 sq miles, so it can never pinpoint one place.
+  // (A drawn circle is stored as a many-sided shape, a fraction smaller than the true circle.)
+  if (areaM2 < TIER_RULES.localMinM2 * 0.995) {
+    throw new TierRuleError(
+      isCircle
+        ? "A Want circle must have a radius of at least 1.5 km (2.7 sq miles), so it can never pinpoint one place."
+        : `A Want area must be at least ${fmtSqMiles(TIER_RULES.localMinM2)}, so it can never pinpoint one place. Draw a bigger shape or choose a larger place.`,
+    );
   }
   for (const o of others) {
     if (o.tier !== "local" || !o.geometry) continue;

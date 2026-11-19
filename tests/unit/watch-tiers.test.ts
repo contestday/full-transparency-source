@@ -41,9 +41,10 @@ describe("tier rules", () => {
     expect(() => checkAreaRules({ tier: "local", geometry: across, areaM2: areaM2(across), isNamedPlace: false, others: [wide] })).not.toThrow();
     const small = circle(sheffield, 1400);
     expect(() => checkAreaRules({ tier: "local", geometry: small, areaM2: areaM2(small), isNamedPlace: false, others: [wide] })).toThrow(/1.5 km/);
-    // Drawn shapes and named places have no true centre, so no minimum.
-    expect(() => checkAreaRules({ tier: "local", geometry: small, areaM2: areaM2(small), isNamedPlace: false, isCircle: false, others: [] })).not.toThrow();
-    expect(() => checkAreaRules({ tier: "local", geometry: small, areaM2: areaM2(small), isNamedPlace: true, others: [] })).not.toThrow();
+    // Drawn shapes and named places need the same 2.7 sq miles: never small enough to pinpoint a place.
+    expect(() => checkAreaRules({ tier: "local", geometry: small, areaM2: areaM2(small), isNamedPlace: false, isCircle: false, others: [] })).toThrow(/2.7 sq miles/);
+    expect(() => checkAreaRules({ tier: "local", geometry: small, areaM2: areaM2(small), isNamedPlace: true, others: [] })).toThrow(/2.7 sq miles/);
+    expect(() => checkAreaRules({ tier: "local", geometry: local, areaM2: areaM2(local), isNamedPlace: true, others: [] })).not.toThrow();
   });
   it("a local area can't sit inside another local area", () => {
     const outer: TierContextArea = { id: "l", tier: "local", mode: null, geometry: circle(sheffield, 3 * MILE_M) };

@@ -31,7 +31,7 @@ export interface EditableArea {
 
 const TIER_HELP: Record<Tier, string> = {
   wide: `At least a 7.5-mile radius, or a named town, city, county or larger (from ${fmtSqMiles(TIER_RULES.wideMinPlaceM2)}). Not inside another Wish area.`,
-  local: `Circles from a 1.5 km radius; a drawn shape or a named place can be any size. It can be on its own, inside a Wish area or across its edge. Not inside another Want area. A circle grows if needed so your Locations inside it are at least 250 m from its edge.`,
+  local: `At least ${fmtSqMiles(TIER_RULES.localMinM2)} (a 1.5 km radius circle), whether drawn, a circle or a named place, so it never pinpoints one place. It can be on its own, inside a Wish area or across its edge. Not inside another Want area. A circle grows if needed so your Locations inside it are at least 250 m from its edge.`,
   location: `Any size, from a single building (25 m) to a 50-mile radius. I'm never shown it. Not inside another Location.`,
 };
 
