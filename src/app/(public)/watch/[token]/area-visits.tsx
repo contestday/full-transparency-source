@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Overlay } from "@/components/overlay";
+import { Skeleton } from "@/components/design";
 import { Button, Notice } from "@/components/ui";
 import { coverageSections, durationText, flaggedPeriods, periodMeaning, sectionIndex, type Coverage, type EvidenceEvent, type EvidencePeriod, type Section } from "@/lib/area-visits";
 import { quickRanges } from "@/lib/history-range";
@@ -156,7 +157,7 @@ export function AreaVisits({
         </div>
 
         {state === "error" && <Notice tone="red">These times could not be loaded. Please try again.</Notice>}
-        {state === "loading" && <p className="text-sm text-muted">Loading…</p>}
+        {state === "loading" && <div className="space-y-3" aria-label="Loading"><Skeleton className="h-[200px]" /><Skeleton className="h-14" /><Skeleton className="h-14" /></div>}
         {state === "ready" && data && (
           <div id="evidence-log" className="space-y-4">
             <div className="hidden print:block">
@@ -178,6 +179,26 @@ export function AreaVisits({
               {data.inside_now && " In it now."}
             </p>
 
+            {/* Since geofenced / not tracked / before, at a glance. */}
+            {grouped.length > 1 && (
+              <div className="space-y-1">
+                <div className="flex h-3 overflow-hidden rounded-full" role="img" aria-label={grouped.map((g) => `${heading(g.sec, g.items).text.split(" · ")[0]}: ${g.items.length}`).join(", ")}>
+                  {[...grouped].reverse().map((g, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        flex: Math.max(1, g.items.length),
+                        background: g.sec.kind === "since" || g.sec.kind === "watched" ? heading(g.sec, g.items).color : g.sec.kind === "gap" ? "repeating-linear-gradient(90deg,#C5D6E5 0 6px,#fff 6px 10px)" : "repeating-linear-gradient(45deg,#C5D6E5 0 4px,#EDF1F5 4px 8px)",
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[11px] text-muted" aria-hidden="true">
+                  <span>Earlier</span>
+                  <span>Now</span>
+                </div>
+              </div>
+            )}
             {grouped.map(({ sec, items }) => {
               const h = heading(sec, items);
               const watchedSec = sec.kind === "since" || sec.kind === "watched";

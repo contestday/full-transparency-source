@@ -23,6 +23,30 @@
   --status-grey: #64748b;
   --status-red: #c62828;
   --status-purple: #7e22ce;
+
+  /* Engagement refresh (design "Full Transparency – engagement refresh"). Decoration uses
+     only ink and the blue family; status colours always mean a status, with a word. */
+  --ice: #f3f8ff;
+  --blue-100: #dce9f7;
+  --blue-200: #bcd0f5;
+  --navy-2: #1b3a63;
+  --signal: #7bf0ba;
+  /* Status tints (backgrounds) and their dark text colours. */
+  --green-bg: #ddf6ec;
+  --green-ink: #005843;
+  --yellow-bg: #fff4c2;
+  --yellow-ink: #5c4700;
+  --yellow-strong: #b08a00;
+  --yellow-chart: #f7d85a;
+  --amber-bg: #ffe8cc;
+  --amber-ink: #7a3e00;
+  --red-bg: #fde2e2;
+  --red-ink: #8e1b1b;
+  --purple-bg: #f1e4fb;
+  --purple-ink: #5b1797;
+  --grey-bg: #edf1f5;
+  --grey-ink: #3e4c5e;
+  --tabbar-h: 78px;
 }
 
 @theme inline {
@@ -41,6 +65,23 @@
   --color-sky: var(--sky);
   --color-mint: var(--mint);
   --color-navy: var(--footer);
+  --color-navy-2: var(--navy-2);
+  --color-ice: var(--ice);
+  --color-blue-100: var(--blue-100);
+  --color-blue-200: var(--blue-200);
+  --color-signal: var(--signal);
+  --color-green-bg: var(--green-bg);
+  --color-green-ink: var(--green-ink);
+  --color-yellow-bg: var(--yellow-bg);
+  --color-yellow-ink: var(--yellow-ink);
+  --color-amber-bg: var(--amber-bg);
+  --color-amber-ink: var(--amber-ink);
+  --color-red-bg: var(--red-bg);
+  --color-red-ink: var(--red-ink);
+  --color-purple-bg: var(--purple-bg);
+  --color-purple-ink: var(--purple-ink);
+  --color-grey-bg: var(--grey-bg);
+  --color-grey-ink: var(--grey-ink);
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-display: var(--font-dm-sans), var(--font-inter), system-ui, sans-serif;
   --radius-control: var(--ft-radius-control);
@@ -78,3 +119,30 @@ h3 {
     animation: none;
   }
 }
+
+/* Loading placeholders. */
+@keyframes ft-shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.ft-skeleton {
+  background: linear-gradient(90deg, var(--grey-bg) 25%, #f7f9fc 50%, var(--grey-bg) 75%);
+  background-size: 200% 100%;
+  animation: ft-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ft-skeleton { animation: none; }
+}
+
+/* Phones: room for the bottom tab bar. */
+.ft-tabbar-space {
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+/* Sideways-scrolling chip rows without a visible scrollbar. */
+.ft-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ft-scroll-x::-webkit-scrollbar { display: none; }

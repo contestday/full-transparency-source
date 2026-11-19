@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
-import { Icon, OnTheMove, StatusDisk, StatusLegend } from "@/components/design";
-import { LIVE_STATUS_META, PUBLIC_LABELS, PUBLIC_STATES, WATCH_LABELS, WATCH_STATES } from "@/lib/live-status";
+import { Icon, OnTheMove, STATUS_TONE, StatusDisk } from "@/components/design";
+import { WeekStrip, type WeekDay } from "@/components/week-strip";
+import { LIVE_STATUS_META, PUBLIC_LABELS, WATCH_LABELS } from "@/lib/live-status";
 import { gridCellRing } from "@/lib/geo";
 import { fmtDateTime, relativeAge } from "@/lib/format";
 import { forgetWatchLink, loadWatchLinks } from "@/lib/watch-links";
@@ -37,7 +38,7 @@ interface WatcherInfo {
  * a cookie), the card shows that watcher's own view instead: amber, red or
  * purple for their areas, labelled with their random watcher number.
  */
-export function LiveStatusCard({ initial }: { initial: PublicLiveStatus }) {
+export function LiveStatusCard({ initial, week, today }: { initial: PublicLiveStatus; week?: WeekDay[]; today?: string }) {
   const [pub, setPub] = useState(initial);
   const now = useNow();
   const [watch, setWatch] = useState<(Shown & WatcherInfo) | null>(null);
@@ -135,76 +136,82 @@ In my home area: movement inside it is never shown.` });
   // FollowMee is silent while the phone is still: an older last reading means "staying put".
   const stillSince = !moving && status !== "unknown" && now && s.observed_at && now - Date.parse(s.observed_at) > 10 * 60_000 ? s.observed_at : null;
 
+  const tone = STATUS_TONE[status] ?? STATUS_TONE.unknown;
+  const updated = s.observed_at && now ? relativeAge(s.observed_at) : null;
+
   return (
     <section
       id="status"
       aria-live="polite"
-      className="scroll-mt-24 space-y-5 rounded-[var(--ft-radius-card)] border border-border bg-surface p-[18px] shadow-[var(--ft-shadow-card)] sm:p-7"
+      className="scroll-mt-24 overflow-hidden rounded-[var(--ft-radius-card)] border border-border bg-surface shadow-[0_8px_24px_rgb(20_43_73/8%)]"
     >
-      <div className="flex items-center justify-between gap-2 text-xs">
-        <span className="font-bold uppercase tracking-[.08em] text-muted">
-          {watch ? `Your view${watch.display_code ? ` · Watcher #${watch.display_code}` : ""}` : "Live status"}
-        </span>
-        <span className="text-muted">Refreshes every minute</span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4">
-        <span className="sm:hidden"><StatusDisk status={status} size={50} /></span>
-        <span className="hidden sm:inline-flex"><StatusDisk status={status} size={64} /></span>
+      {/* The status, in its colour, with its word and icon. */}
+      <div className="flex items-center gap-3.5 p-4 sm:p-6" style={{ background: tone.bg, color: tone.ink }}>
+        <span className="sm:hidden"><StatusDisk status={status} size={56} /></span>
+        <span className="hidden sm:inline-flex"><StatusDisk status={status} size={68} /></span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[26px] font-bold leading-tight sm:text-[32px]">{label}</h2>
-          <p className="text-sm text-muted tabular-nums">
-            {s.status_since && status !== "unknown" ? `Since ${fmtDateTime(s.status_since)}` : meta.description}
+          <p className="text-xs font-bold uppercase tracking-[.08em]">
+            {watch ? `Your view${watch.display_code ? ` · Watcher #${watch.display_code}` : ""}` : "Live status"}
           </p>
-          {stillSince && <p className="text-sm text-muted tabular-nums">Not moved since {fmtDateTime(stillSince)} ({relativeAge(stillSince)})</p>}
+          <h2 className="text-[24px] font-bold leading-tight text-ink sm:text-[32px]">{label}</h2>
+          <p className="text-[13px] tabular-nums">
+            <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: tone.dot, boxShadow: "0 0 0 3px var(--signal)" }} aria-hidden="true" />
+            {s.status_since && status !== "unknown" ? `Since ${fmtDateTime(s.status_since)}` : meta.description}
+            {updated ? ` · updated ${updated}` : ""}
+          </p>
+          {stillSince && <p className="text-[13px] tabular-nums">Not moved since {fmtDateTime(stillSince)}</p>}
         </div>
         {moving && <OnTheMove status={status} />}
       </div>
 
       {features.length > 0 ? (
-        <div className="relative h-[240px] overflow-hidden rounded-[14px] sm:h-[280px]">
+        <div className="relative h-[170px] sm:h-[260px]">
           <LazyMap features={features} className="h-full w-full" initialZoom={12} ariaLabel={`Map: approximate area, ${label}${moving ? ", on the move" : ""}`} />
-          <span className="pointer-events-none absolute left-3 top-3 inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 text-xs font-medium">
-            <Icon name="pin" className="h-4 w-4 text-accent" /> {inHome ? "In my home area · movement here is never shown" : `Approximate area · about ${cellKm} km square`}
+          <span className="pointer-events-none absolute bottom-2.5 left-2.5 inline-flex h-7 items-center gap-1.5 rounded-full bg-white/95 px-3 text-xs font-semibold">
+            <Icon name={inHome ? "home" : "pin"} className="h-4 w-4" />
+            {inHome ? "In my home area" : `Approximate area · about ${cellKm} km square`}
           </span>
         </div>
       ) : status === "unknown" ? (
-        <div className="flex h-[140px] items-center gap-3 rounded-[14px] border-2 border-dashed border-[#B8C6D4] bg-[#F7FAFD] p-5 text-sm text-muted">
+        <div className="flex items-center gap-3 bg-[#F7FAFD] p-5 text-sm text-muted">
           <Icon name="dash" className="h-6 w-6" />
           <p>
-            <strong className="text-ink">No recent GPS update.</strong> The phone may be idle, charging or out of signal. This
-            is not by itself a cause for concern.
+            <strong className="text-ink">No recent GPS update.</strong> The phone may be idle, charging or out of signal.
           </p>
         </div>
       ) : (
-        <div className="flex h-[140px] items-center gap-3 rounded-[14px] bg-mint p-5 text-sm text-[#005843]">
+        <div className="flex items-center gap-3 bg-green-bg p-5 text-sm text-green-ink">
           <Icon name="lock" className="h-6 w-6" />
           <p>
-            <strong>Position not shown near home.</strong>{" "}
-            {moving ? "On the move: the marker appears once I'm a short distance away." : "The marker reappears once I'm a short distance away."}
+            <strong>Position not shown near home.</strong> {moving ? "On the move." : "It reappears a short distance away."}
           </p>
         </div>
       )}
 
-      {watch ? (
-        <StatusLegend states={[...WATCH_STATES]} current={status} labels={WATCH_LABELS} />
-      ) : (
-        <StatusLegend states={[...PUBLIC_STATES]} current={status as (typeof PUBLIC_STATES)[number]} labels={PUBLIC_LABELS} />
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-4 text-sm">
-        <span className="text-muted tabular-nums">
-          {s.observed_at ? `Last GPS update ${relativeAge(s.observed_at)} · ${fmtDateTime(s.observed_at)}` : "No GPS update yet"}
-        </span>
-        {watch ? (
-          <Link href={`/watch/${watch.token}`} className="font-semibold text-accent hover:underline">
-            Your places ({watch.areaCount}) →
-          </Link>
-        ) : (
-          <Link href="/geofences/submit" className="font-semibold text-accent hover:underline">
-            Watch your own areas →
-          </Link>
+      <div className="space-y-4 p-4 sm:p-6">
+        {!watch && week && today && (
+          <div className="space-y-2.5">
+            <div className="flex items-baseline justify-between">
+              <p className="text-[15px] font-bold">This week</p>
+              <Link href="/history" className="text-[13px] font-semibold text-accent">
+                Open in History
+              </Link>
+            </div>
+            <WeekStrip days={week} today={today} />
+          </div>
         )}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 text-sm">
+          <span className="text-muted tabular-nums">{s.observed_at ? `Last GPS ${relativeAge(s.observed_at)}` : "No GPS update yet"}</span>
+          {watch ? (
+            <Link href={`/watch/${watch.token}`} className="font-semibold text-accent hover:underline">
+              Your places ({watch.areaCount}) →
+            </Link>
+          ) : (
+            <Link href="/geofences/submit" className="font-semibold text-accent hover:underline">
+              Watch your own areas →
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   );

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
 import { Button, Card, cn, Notice } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
-import { Container, EmptyState, Icon, MapFrame, OnTheMove, StatusDisk } from "@/components/design";
+import { Container, EmptyState, Icon, MapFrame, OnTheMove, StatusDisk, STATUS_TONE } from "@/components/design";
 import { InfoButton } from "@/components/info-button";
 import { InstallAppButton } from "@/components/pwa";
 import { SaveWatchLink } from "@/components/save-watch-link";
@@ -78,6 +78,34 @@ const letter = (i: number) => String.fromCharCode(65 + i);
 const ZONES: Zone[] = ["purple", "red", "amber", "yellow", "green"];
 
 /** One line describing an area: its rule and size. */
+interface AreaStat {
+  reference: string;
+  visits: number;
+  minutes: number;
+  perDay: number[];
+  inside_now: boolean;
+  watched_days: number;
+}
+
+const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} m` : ""}` : `${m} m`);
+
+/** The last 30 days as small bars (one per day, today outlined), with a text description. */
+function AreaSparkline({ perDay, color }: { perDay: number[]; color: string }) {
+  const max = Math.max(1, ...perDay);
+  const busy = perDay.filter((m) => m > 0).length;
+  return (
+    <div className="flex h-9 items-end gap-[3px] border-b border-hairline" role="img" aria-label={`Last 30 days: in this area on ${busy} ${busy === 1 ? "day" : "days"}`}>
+      {perDay.map((m, i) => (
+        <span
+          key={i}
+          className={cn("flex-1 rounded-t-sm", i === perDay.length - 1 && "outline outline-1 outline-ink")}
+          style={{ height: m ? `${Math.max(12, (m / max) * 100)}%` : "2px", background: m ? color : "#E3ECF4" }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function areaSummary(a: Area): string {
   if (a.kind === "beyond_home") return `Anywhere more than about ${formatDistance(a.distance_m ?? 0)} from home`;
   if (a.kind === "location") {
@@ -102,6 +130,18 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   // Which period's journey: Today, Yesterday, This week, This month, This year or All time.
   const [rangeKey, setRangeKey] = useState("week");
   const [journeyTick, setJourneyTick] = useState(0);
+  // Each area's last 30 days (visits, time, minutes per day).
+  const [stats, setStats] = useState<Record<string, AreaStat>>({});
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/watch/${token}/area-stats`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { areas: AreaStat[] } | null) => live && d && setStats(Object.fromEntries(d.areas.map((a) => [a.reference, a]))))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [token, view?.areas.length]);
   // The area whose entries and exits are open in the overlay.
   const [visitsFor, setVisitsFor] = useState<Area | null>(null);
   const [blocked, setBlocked] = useState(false);
@@ -305,8 +345,8 @@ In my home area: movement inside it is never shown.` });
       )}
       <div className="bg-navy text-[#DCE7F3]">
         <Container className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 text-sm">
-          <Icon name="lock" className="shrink-0 text-white" />
-          <span className="min-w-0 flex-1 basis-48">Only people with this link can see this page.</span>
+          <Icon name="lock" className="shrink-0 text-signal" />
+          <span className="min-w-0 flex-1 basis-40">Private to your link</span>
           <div className="flex items-center gap-3">
             <Button
               size="sm"
@@ -328,9 +368,14 @@ In my home area: movement inside it is never shown.` });
 
       {!sample && <NotifyPrompt compact target="watch" token={token} vapidPublicKey={vapidPublicKey} />}
 
-      <Container className="space-y-6 pb-20 pt-6 sm:pt-8">
+      <div className="bg-sky">
+        <Container className="py-4 sm:py-7">
+          <h1 className="text-[28px] font-bold sm:text-[40px]">{sample ? "Try a watcher's view" : "Your watched places"}</h1>
+          <p className="mt-0.5">Your areas, in your colours.</p>
+        </Container>
+      </div>
+      <Container className="space-y-6 pb-20 pt-4 sm:pt-6">
         <div>
-          <h1 className="text-[28px] font-bold sm:text-[44px]">{sample ? "Try a watcher's view" : "Your watched places"}</h1>
           {view?.is_sample && !sample && (
             <Notice tone="amber" title="This is the public sample watch link">
               You&apos;re setting it up. It isn&apos;t saved as your own watch link on this device. Lock it in Admin → Settings when
@@ -345,18 +390,15 @@ In my home area: movement inside it is never shown.` });
         </div>
 
         <div className="flex flex-wrap gap-6">
-          <section aria-live="polite" className="min-w-0 grow-[7] basis-[520px] space-y-4 rounded-[var(--ft-radius-card)] border border-border bg-surface p-4 shadow-[var(--ft-shadow-card)] sm:p-7">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold uppercase tracking-[.08em] text-muted">Status for my areas</span>
-              <span className="text-muted">Refreshes every minute</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <section aria-live="polite" className="min-w-0 grow-[7] basis-[520px] space-y-4 overflow-hidden rounded-[var(--ft-radius-card)] border border-border bg-surface shadow-[0_8px_24px_rgb(20_43_73/8%)]">
+            <div className="flex flex-wrap items-center gap-3 p-4 sm:gap-4 sm:p-6" style={{ background: STATUS_TONE[status]?.bg, color: STATUS_TONE[status]?.ink }}>
               <StatusDisk status={status} size={52} />
               <div className="min-w-0 flex-1">
-                <h2 className="text-[22px] font-bold leading-tight sm:text-[32px]">
+                <p className="text-xs font-bold uppercase tracking-[.08em]">Status for your areas</p>
+                <h2 className="text-[22px] font-bold leading-tight text-ink sm:text-[32px]">
                   {view ? (WATCH_LABELS[status as keyof typeof WATCH_LABELS] ?? meta.label) : "Loading…"}
                 </h2>
-                <p className="text-sm text-muted tabular-nums">
+                <p className="text-[13px] tabular-nums">
                   {view?.observed_at && !view.moving && status !== "unknown" && now && now - Date.parse(view.observed_at) > 10 * 60_000
                     ? `Not moved since ${fmtDateTime(view.observed_at)} (${relativeAge(view.observed_at)})`
                     : view?.observed_at
@@ -369,25 +411,33 @@ In my home area: movement inside it is never shown.` });
               {view?.moving && status !== "unknown" && status !== "disabled" && <OnTheMove status={status} />}
             </div>
 
-            <div data-sample-ok className="flex flex-wrap items-center gap-2" role="group" aria-label="Which period's journey">
-              <span className="text-sm font-semibold">Journey:</span>
+            <div data-sample-ok className="ft-scroll-x flex gap-2 px-4 sm:px-6" role="group" aria-label="Which period's journey">
               {(today ? quickRanges(today) : []).map((r) => (
-                <Button key={r.key} type="button" size="sm" variant={rangeKey === r.key ? "primary" : "secondary"} aria-pressed={rangeKey === r.key} onClick={() => setRangeKey(r.key)}>
+                <button
+                  key={r.key}
+                  type="button"
+                  aria-pressed={rangeKey === r.key}
+                  onClick={() => setRangeKey(r.key)}
+                  className={cn(
+                    "inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-semibold",
+                    rangeKey === r.key ? "border-ink bg-ink text-white" : "border-border bg-white text-ink",
+                  )}
+                >
                   {r.label}
-                </Button>
+                </button>
               ))}
             </div>
-            {journey && journey.routes === false && <p className="text-sm text-muted">Showing the places I stayed. Routes are drawn for up to 21 days.</p>}
+            {journey && journey.routes === false && <p className="px-4 text-sm text-muted sm:px-6">Showing the places I stayed. Routes are drawn for up to 21 days.</p>}
 
-            <div ref={mapRef} data-sample-ok>
+            <div ref={mapRef} data-sample-ok className="px-4 sm:px-6">
               <MapFrame className="border-0 p-0 shadow-none">
                 <LazyMap features={features} fit="once" focus={focus} className="h-[320px] w-full sm:h-[480px]" ariaLabel="Map of my areas, the day's journey and the approximate live position" />
               </MapFrame>
             </div>
             {journey && !journey.segments.length && !journey.stops.length && (
-              <p className="text-sm text-muted">Nothing published for this period yet.</p>
+              <p className="px-4 text-sm text-muted sm:px-6">Nothing published for this period yet.</p>
             )}
-            <InfoButton label="What the colours mean">
+            <InfoButton label="What the colours mean" className="px-4 pb-4 sm:px-6 sm:pb-6">
               <ul className="space-y-1.5">
                 {ZONES.map((z) => (
                   <li key={z} className="flex items-center gap-2">
@@ -410,29 +460,52 @@ In my home area: movement inside it is never shown.` });
               <ul data-private className="space-y-2">
                 {view?.areas.map((a, i) => {
                   const on = a.reference === selected;
+                  const st = stats[a.reference];
+                  const tierTone = STATUS_TONE[a.tier === "wide" ? "amber" : a.tier === "local" ? "red" : "purple"];
                   return (
-                    <li key={a.reference} className={cn("rounded-xl border p-3", on ? "border-2 border-ink" : "border-hairline")}>
-                      <button type="button" data-sample-ok className="flex w-full items-start gap-3 text-left" onClick={() => showArea(a, i)} aria-pressed={on}>
+                    <li key={a.reference} className={cn("space-y-2.5 rounded-2xl border bg-white p-3.5", on ? "border-2 border-ink" : "border-hairline")}>
+                      <button type="button" data-sample-ok className="flex w-full items-center gap-3 text-left" onClick={() => showArea(a, i)} aria-pressed={on}>
                         <span
-                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-white"
-                          style={{ background: TIER_META[a.tier].color }}
+                          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold"
+                          style={{ background: tierTone.bg, color: tierTone.ink, boxShadow: `inset 0 0 0 2px ${TIER_META[a.tier].color}` }}
                         >
                           {letter(i)}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-semibold [overflow-wrap:anywhere]">{a.name || TIER_META[a.tier].label}</span>
-                          <span className="block text-xs text-muted">
-                            {TIER_META[a.tier].label} · {areaSummary(a)}
+                          <span className="block font-bold [overflow-wrap:anywhere]">{a.name || TIER_META[a.tier].label}</span>
+                          <span className="mt-0.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: tierTone.bg, color: tierTone.ink }}>
+                            <span className="h-2 w-2 rounded-full" style={{ background: TIER_META[a.tier].color }} aria-hidden="true" />
+                            {TIER_META[a.tier].label}
+                            {a.tier === "location" ? " · only you see it" : a.mode === "outside" ? " · didn't leave" : ""}
                           </span>
-                          {a.kind === "beyond_home" && <span className="block text-xs text-muted">Not drawn (it would point to my home).</span>}
-                          {a.effective_from && <span className="block text-xs text-muted">In effect from {fmtDateTime(a.effective_from)}</span>}
-                          {a.tier === "location" && <span className="block text-xs text-muted">Only you can see it.</span>}
+                          <span className="block text-xs text-muted">{areaSummary(a)}</span>
                         </span>
+                        {st && (
+                          <span className="shrink-0 text-right">
+                            <span className={cn("block font-display text-lg font-bold leading-tight tabular-nums", !st.visits && "text-green-ink")}>{st.visits ? hm(st.minutes) : "0"}</span>
+                            <span className="block text-xs text-muted">{st.visits === 1 ? "1 visit" : `${st.visits} visits`}</span>
+                          </span>
+                        )}
                       </button>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
-                        <Button type="button" size="sm" data-sample-ok onClick={() => setVisitsFor(a)}>
-                          Times in this area
-                        </Button>
+                      {st && st.visits > 0 && <AreaSparkline perDay={st.perDay} color={TIER_META[a.tier].color} />}
+                      {st && st.visits === 0 && st.watched_days > 0 && (
+                        <p className="flex items-center gap-2 rounded-lg bg-ice px-2.5 py-2 text-[13px]">
+                          <Icon name="check" className="h-4 w-4 text-jade" />
+                          <span>
+                            <b>{Math.min(30, st.watched_days)} {st.watched_days === 1 ? "day" : "days"}</b> with no visits{st.watched_days < 30 ? " since you set it" : ""}
+                          </span>
+                        </p>
+                      )}
+                      {a.kind === "beyond_home" && <p className="text-xs text-muted">Not drawn (it would point to my home).</p>}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          data-sample-ok
+                          onClick={() => setVisitsFor(a)}
+                          className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-ice px-3 text-sm font-semibold text-[#1947B5]"
+                        >
+                          <Icon name="clock" className="h-4 w-4" /> Times in this area
+                        </button>
                         <Button
                           type="button"
                           size="sm"
@@ -448,14 +521,13 @@ In my home area: movement inside it is never shown.` });
                         <ConfirmButton prompt="Remove?" confirmLabel="Remove" onConfirm={() => removeArea(a.reference)}>
                           Remove
                         </ConfirmButton>
-                        <span className="ml-auto text-xs text-muted">{a.reference}</span>
-                      </div>
-                    </li>
+                        <span className="ml-auto text-xs text-muted">{a.effective_from ? `From ${fmtDateTime(a.effective_from)}` : a.reference}</span>
+                      </div>                    </li>
                   );
                 })}
               </ul>
               <Button
-                variant="secondary"
+                variant={adding ? "secondary" : "primary"}
                 className="w-full"
                 onClick={() => {
                   setEditing(null);
@@ -463,7 +535,13 @@ In my home area: movement inside it is never shown.` });
                   setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
                 }}
               >
-                {adding ? "Close" : "Add an area"}
+                {adding ? (
+                  "Close"
+                ) : (
+                  <>
+                    <Icon name="plus" /> Add an area
+                  </>
+                )}
               </Button>
             </Card>
 

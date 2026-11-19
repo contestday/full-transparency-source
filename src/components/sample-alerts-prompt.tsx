@@ -55,26 +55,17 @@ export function SampleAlertsPrompt({ sampleToken }: { sampleToken: string | null
 
   if (!show) return null;
   return (
-    <section className="flex flex-wrap items-center gap-5 rounded-[var(--ft-radius-card)] border-2 border-[#B45309] bg-[#FFF4D6] p-6 sm:p-8">
-      <Icon name="bell" className="h-10 w-10 shrink-0 text-[#B45309]" />
-      <div className="min-w-0 flex-1 basis-72 space-y-2">
-        <h2 className="text-[24px] font-bold sm:text-[28px]">Try it: get the sample&apos;s real alerts</h2>
-        <p className="text-[16px]">
-          The sample watcher has real areas set up. Turn on sample alerts and your phone gets the same alerts a watcher would, as they happen, each
-          clearly marked <strong>SAMPLE</strong>. Turn them off any time with one tap.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/sample#sample-alerts"
-          className="inline-flex h-12 items-center gap-2 rounded-[var(--ft-radius-control)] bg-[#B45309] px-5 font-semibold text-white hover:brightness-95"
-        >
-          Open the sample <span aria-hidden="true">→</span>
-        </Link>
-        <button type="button" onClick={snooze} className="h-12 px-2 text-sm font-semibold text-[#7C2D12] underline">
-          Not now (hide for 7 days)
-        </button>
-      </div>
+    <section aria-label="Try the sample's alerts" className="flex items-center gap-3 rounded-2xl bg-navy py-3 pl-3.5 pr-2 text-white">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy-2 text-signal">
+        <Icon name="bell" />
+      </span>
+      <p className="flex-1 text-sm font-semibold leading-snug">Try the sample&apos;s alerts on this phone</p>
+      <Link href="/sample#sample-alerts" className="inline-flex h-10 shrink-0 items-center rounded-xl bg-white px-3.5 text-sm font-semibold text-ink">
+        Try it
+      </Link>
+      <button type="button" onClick={snooze} aria-label="Not now (hide for 7 days)" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[#DCE7F3] hover:bg-navy-2">
+        <Icon name="close" />
+      </button>
     </section>
   );
 }

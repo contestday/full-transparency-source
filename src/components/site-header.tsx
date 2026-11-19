@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Logo } from "@/components/brand";
-import { Icon, StatusDot, type IconName } from "@/components/design";
+import { Icon, STATUS_TONE, StatusDot, type IconName } from "@/components/design";
+import { ShareButton } from "@/components/share-button";
 import { cn } from "@/components/ui";
 import { LIVE_STATUS_META } from "@/lib/live-status";
 import { loadWatchLinks } from "@/lib/watch-links";
 
-const NAV: { href: string; label: string; icon: IconName }[] = [
+/** Every page in the menu (short labels; each page's heading describes it). */
+export const MENU: { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "Home", icon: "home" },
   { href: "/history", label: "History", icon: "history" },
   { href: "/history/watched", label: "Your view", icon: "eye" },
@@ -21,10 +23,12 @@ const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/privacy", label: "Privacy", icon: "lock" },
   { href: "/about", label: "FAQs", icon: "info" },
 ];
+/** On desktop, these sit under "More" so the header stays on one line. */
+const DESKTOP_MORE = new Set(["/sample", "/privacy", "/about"]);
 
 type Status = keyof typeof LIVE_STATUS_META;
 
-function isCurrent(pathname: string, href: string) {
+export function isCurrent(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/history") return pathname === "/history";
   if (href === "/geofences/submit") return pathname.startsWith("/geofences");
@@ -32,7 +36,7 @@ function isCurrent(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function useLiveStatus(enabled: boolean): Status | null {
+export function useLiveStatus(enabled: boolean): Status | null {
   const [status, setStatus] = useState<Status | null>(null);
   useEffect(() => {
     if (!enabled) return;
@@ -55,16 +59,8 @@ function useLiveStatus(enabled: boolean): Status | null {
   return status;
 }
 
-export function SiteHeader() {
-  const pathname = usePathname() ?? "/";
-  const [open, setOpen] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
-  const sheet = useRef<HTMLDivElement>(null);
-  // The private watch view shows its own status; don't show the public one there.
-  const showChip = !pathname.startsWith("/watch/");
-  const status = useLiveStatus(showChip);
-  const chipStatus = status && status !== "disabled" ? status : null;
-  // Signed in as staff: add an Admin link (the installed app has no address bar).
+/** Signed in as staff: an Admin link is added (the installed app has no address bar). */
+export function useStaff(): boolean {
   const [staff, setStaff] = useState(false);
   useEffect(() => {
     fetch("/api/me", { cache: "no-store" })
@@ -72,139 +68,120 @@ export function SiteHeader() {
       .then((b) => setStaff(Boolean(b?.staff)))
       .catch(() => undefined);
   }, []);
-  // "Where I.ve been: your view" only for watchers: this device has a watch link saved.
+  return staff;
+}
+
+export function SiteHeader() {
+  const pathname = usePathname() ?? "/";
+  // The private watch view shows its own status; don't show the public one there.
+  const showChip = !pathname.startsWith("/watch/");
+  const status = useLiveStatus(showChip);
+  const chip = showChip && status && status !== "disabled" ? status : null;
+  const staff = useStaff();
   const [watcher, setWatcher] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setWatcher(loadWatchLinks().length > 0);
+    setMoreOpen(false);
   }, [pathname]);
-  const visible = NAV.filter((n) => n.href !== "/history/watched" || watcher);
-  const nav = staff ? [...visible, { href: "/admin", label: "Admin", icon: "lock" as IconName }] : visible;
-
   useEffect(() => {
-    // Close the menu on navigation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!open) return;
-    const first = sheet.current?.querySelector<HTMLElement>("a,button");
-    first?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        menuButton.current?.focus();
-      }
-      if (e.key === "Tab" && sheet.current) {
-        const items = [...sheet.current.querySelectorAll<HTMLElement>("a,button")];
-        const firstEl = items[0];
-        const lastEl = items.at(-1);
-        if (e.shiftKey && document.activeElement === firstEl) {
-          e.preventDefault();
-          lastEl?.focus();
-        } else if (!e.shiftKey && document.activeElement === lastEl) {
-          e.preventDefault();
-          firstEl?.focus();
-        }
-      }
-    };
+    if (!moreOpen) return;
+    const onDown = (e: MouseEvent) => !moreRef.current?.contains(e.target as Node) && setMoreOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMoreOpen(false);
+    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
     return () => {
+      document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
     };
-  }, [open]);
+  }, [moreOpen]);
+
+  const visible = MENU.filter((n) => n.href !== "/history/watched" || watcher);
+  const main = visible.filter((n) => !DESKTOP_MORE.has(n.href));
+  const more = [...visible.filter((n) => DESKTOP_MORE.has(n.href)), ...(staff ? [{ href: "/admin", label: "Admin", icon: "lock" as IconName }] : [])];
+  const moreOn = more.some((m) => isCurrent(pathname, m.href));
 
   return (
-    <>
-    <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-[1264px] items-center gap-3 px-4 sm:px-8 lg:h-[72px]">
-        <Link href="/" aria-label="Full Transparency home" className="mr-auto">
+    <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur print:hidden">
+      <div className="mx-auto flex h-[60px] w-full max-w-[1264px] items-center gap-2 px-4 sm:px-8 lg:h-[76px] lg:gap-4">
+        <Link href="/" aria-label="Full Transparency home" className="mr-auto shrink-0">
           {/* Mark + real text, so the name is readable on a phone. */}
-          <span className="inline-flex items-center gap-2.5">
-            <Logo variant="mark" className="h-10 w-10 lg:h-11 lg:w-11" />
-            <span className="text-[20px] font-bold leading-none tracking-[-0.01em] text-ink lg:text-[22px]">Full Transparency</span>
+          <span className="inline-flex items-center gap-2">
+            <Logo variant="mark" className="h-9 w-9 lg:h-11 lg:w-11" />
+            <span className="font-display text-[18px] font-bold leading-none tracking-[-0.01em] text-ink lg:text-[21px]">Full Transparency</span>
           </span>
         </Link>
 
-        {showChip && chipStatus && (
+        {/* Desktop: the menu in the header. */}
+        <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
+          {main.map((n) => {
+            const on = isCurrent(pathname, n.href);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "inline-flex h-10 items-center rounded-lg px-3 text-[15px] font-semibold",
+                  on ? "bg-sky text-ink shadow-[inset_0_-3px_0_var(--accent)]" : "text-muted hover:bg-ice hover:text-ink",
+                )}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
+          <div ref={moreRef} className="relative">
+            <button
+              type="button"
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((o) => !o)}
+              className={cn(
+                "inline-flex h-10 items-center gap-1 rounded-lg px-3 text-[15px] font-semibold",
+                moreOn ? "bg-sky text-ink shadow-[inset_0_-3px_0_var(--accent)]" : "text-muted hover:bg-ice hover:text-ink",
+              )}
+            >
+              More <Icon name="chevron" className="h-4 w-4 rotate-90" />
+            </button>
+            {moreOpen && (
+              <div className="absolute right-0 top-12 z-40 w-56 overflow-hidden rounded-2xl border border-border bg-white py-1 shadow-xl">
+                {more.map((m) => (
+                  <Link
+                    key={m.href}
+                    href={m.href}
+                    aria-current={isCurrent(pathname, m.href) ? "page" : undefined}
+                    className="flex h-11 items-center gap-3 px-4 text-[15px] font-medium hover:bg-ice"
+                  >
+                    <Icon name={m.icon} className="h-4 w-4 text-accent" />
+                    {m.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </nav>
+
+        {chip && (
           <Link
             href="/#status"
-            className="hidden h-9 items-center gap-2 rounded-full border border-border bg-white px-3 text-sm font-medium lg:inline-flex"
+            aria-label={`Live status: ${LIVE_STATUS_META[chip].label}`}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-3 text-[13px] font-semibold lg:text-sm"
+            style={{ background: STATUS_TONE[chip].bg, color: STATUS_TONE[chip].ink }}
           >
-            <StatusDot status={chipStatus} />
-            {LIVE_STATUS_META[chipStatus].label}
+            <StatusDot status={chip} />
+            <span className="hidden min-[400px]:inline lg:hidden">{STATUS_TONE[chip].short}</span>
+            <span className="hidden lg:inline">{LIVE_STATUS_META[chip].label}</span>
           </Link>
         )}
 
-        {showChip && chipStatus && (
-          <Link
-            href="/#status"
-            aria-label={`Live status: ${LIVE_STATUS_META[chipStatus].label}`}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border lg:hidden"
-          >
-            <StatusDot status={chipStatus} className="h-3.5 w-3.5" />
-          </Link>
-        )}
-
-        <button
-          ref={menuButton}
-          type="button"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-border"
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          aria-label={open ? "Close menu" : "Open menu"}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <Icon name={open ? "close" : "menu"} />
-        </button>
+        <span className="lg:hidden">
+          <ShareButton variant="icon" />
+        </span>
+        <span className="hidden lg:inline-flex">
+          <ShareButton variant="pill" />
+        </span>
       </div>
     </header>
-
-      {/* Outside the header: its backdrop blur would trap a fixed-position sheet. */}
-      {open && (
-        <div
-          id="mobile-menu"
-          ref={sheet}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Menu"
-          className="fixed inset-x-0 bottom-0 top-16 z-40 overflow-y-auto bg-white lg:left-auto lg:top-[72px] lg:w-[400px] lg:border-l lg:border-border lg:shadow-xl"
-        >
-          <nav aria-label="Primary" className="divide-y divide-hairline border-b border-hairline">
-            {nav.map((n) => {
-              const on = isCurrent(pathname, n.href);
-              return (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  aria-current={on ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex h-14 w-full items-center gap-3 px-5 text-base font-medium",
-                    on ? "bg-sky shadow-[inset_3px_0_0_var(--accent)]" : "",
-                  )}
-                >
-                  <Icon name={n.icon} className="text-accent" />
-                  <span className="flex-1">{n.label}</span>
-                  <Icon name="chevron" className="h-4 w-4 text-muted" />
-                </Link>
-              );
-            })}
-          </nav>
-          {chipStatus && (
-            <Link href="/#status" className="m-5 flex items-center gap-3 rounded-[var(--ft-radius-card)] border border-border p-4">
-              <StatusDot status={chipStatus} className="h-4 w-4" />
-              <span>
-                <span className="block text-xs font-bold uppercase tracking-[.08em] text-muted">Live status</span>
-                <span className="font-semibold">{LIVE_STATUS_META[chipStatus].label}</span>
-              </span>
-            </Link>
-          )}
-        </div>
-      )}
-    </>
   );
 }

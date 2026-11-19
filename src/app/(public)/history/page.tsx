@@ -48,9 +48,8 @@ export default async function HistoryPage({ searchParams }: PageProps<"/history"
             My stays and routes on a map. Updated <strong className="text-ink">{fmtDateTime(data.lastPublishedAt)}</strong>.
           </>
         }
-      >
-        <RangePicker basePath="/history" today={today} from={from} to={to} place={placeQ} />
-      </PageHead>
+      />
+      <RangePicker basePath="/history" today={today} from={from} to={to} place={placeQ} />
       <Container className="space-y-4 pb-20 pt-6">
         {data.paused && (
           <Notice tone="amber" title="Publication is currently paused">

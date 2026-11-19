@@ -8,11 +8,11 @@ const MESSAGE = "Please share with anyone you feel may wish to see this: family,
 const SHARE_TEXT = "Full Transparency: where I've been, where I'm going and whether I'm within my usual area, shared openly.";
 
 /**
- * A share button floating at the bottom right of every public page. It always
- * shares the site's front page, never the page's own address (a watch page's
- * address is a private link).
+ * Share the site: an icon (phone header), a pill (desktop header) or a tile
+ * (the More menu). It always shares the site's front page, never the page's
+ * own address (a watch page's address is a private link).
  */
-export function ShareButton() {
+export function ShareButton({ variant = "icon" }: { variant?: "icon" | "pill" | "tile" }) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
@@ -50,10 +50,28 @@ export function ShareButton() {
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-[45] inline-flex h-14 items-center gap-2 rounded-full bg-accent px-5 font-semibold text-white shadow-lg ring-4 ring-white/70 hover:bg-accent-hover print:hidden"
+        aria-label={variant === "icon" ? "Share" : undefined}
+        className={
+          variant === "icon"
+            ? "inline-flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-white text-ink print:hidden"
+            : variant === "pill"
+              ? "inline-flex h-10 items-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover print:hidden"
+              : "flex min-h-[88px] flex-col items-start justify-between gap-2 rounded-2xl border border-hairline bg-white p-3.5 text-left font-semibold print:hidden"
+        }
       >
-        <Icon name="share" className="h-6 w-6" />
-        Share
+        {variant === "tile" ? (
+          <>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-accent">
+              <Icon name="share" />
+            </span>
+            Share
+          </>
+        ) : (
+          <>
+            <Icon name="share" className={variant === "pill" ? "h-4 w-4" : undefined} />
+            {variant === "pill" && "Share"}
+          </>
+        )}
       </button>
       {open && (
         <Overlay title="Share Full Transparency" onClose={() => setOpen(false)}>

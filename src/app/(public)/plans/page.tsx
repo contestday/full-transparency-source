@@ -5,7 +5,10 @@ import { Notice } from "@/components/ui";
 import { Container, EmptyState, Icon, PageHead } from "@/components/design";
 import { fmtDate, londonDayKey } from "@/lib/format";
 import { PLAN_WINDOW_DAYS, planListOrder, windowPlans } from "@/lib/plans";
-import { PlanCard, PlanFilters, PlansTabs, filterQuery, planPoint, str } from "./plans-shared";
+import { PlanCard, PlanFilters, PlansTabs, filterQuery, planPoint, planWhen, planWhere, str } from "./plans-shared";
+import { PlanMapButton } from "./plan-map-button";
+import { InfoButton } from "@/components/info-button";
+import { shiftDay } from "@/lib/history-range";
 import { loadPublicZoneContext, publicZone } from "@/lib/zones";
 import { WatchZonesProvider } from "@/components/watch-zones";
 
@@ -55,11 +58,64 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
       <PageHead
         title="Where I'm going"
         art="plans"
-        lead="What I plan to do. Plans are intentions, not GPS records."
+        lead={
+          <span className="flex flex-wrap items-center gap-x-3">
+            What I plan to do.
+            <InfoButton label="About plans">
+              <p>Plans are intentions, not GPS records. Where GPS later matches a plan, that is shown on it.</p>
+            </InfoButton>
+          </span>
+        }
       >
         <PlansTabs active="list" query={filterQuery(sp, ["category", "status"])} />
       </PageHead>
       <Container className="space-y-5 pb-20 pt-6">
+        {!showPast && !failed && (() => {
+          // The next 7 days with a dot for each plan, then the next plan in full.
+          const week = [0, 1, 2, 3, 4, 5, 6].map((i) => shiftDay(todayKey, i));
+          const next = visible.find((p) => p.status !== "cancelled");
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-7 gap-1.5" role="list" aria-label="The next 7 days">
+                {week.map((d) => {
+                  const n = (groups.get(d) ?? []).length;
+                  const dt = new Date(`${d}T12:00:00Z`);
+                  return (
+                    <div
+                      key={d}
+                      role="listitem"
+                      aria-label={`${fmtDate(`${d}T12:00:00Z`, { dateStyle: "full" })}: ${n ? `${n} plan${n === 1 ? "" : "s"}` : "no plans"}`}
+                      className={`flex flex-col items-center gap-1 rounded-xl py-2 ${d === todayKey ? "bg-navy text-white" : "bg-white text-ink"} border border-hairline`}
+                    >
+                      <span className="text-[11px] font-semibold uppercase opacity-80">{dt.toLocaleDateString("en-GB", { weekday: "short" })}</span>
+                      <span className="font-display text-lg font-bold leading-none tabular-nums">{dt.getUTCDate()}</span>
+                      <span className="flex h-2 gap-0.5" aria-hidden="true">
+                        {[0, 1, 2].slice(0, Math.min(n, 3)).map((i) => (
+                          <span key={i} className={`h-1.5 w-1.5 rounded-full ${d === todayKey ? "bg-signal" : "bg-accent"}`} />
+                        ))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {next && (
+                <div className="space-y-3 rounded-2xl bg-accent p-4 text-white shadow-[0_8px_24px_rgb(36_90_214/25%)] sm:p-5">
+                  <p className="text-xs font-bold uppercase tracking-[.08em] text-blue-100">Next up</p>
+                  <p className="font-display text-xl font-bold leading-snug">{next.title}</p>
+                  <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-blue-100">
+                    <span className="inline-flex items-center gap-1.5"><Icon name="clock" className="h-4 w-4" />{planWhen(next)}</span>
+                    <span className="inline-flex items-center gap-1.5"><Icon name="pin" className="h-4 w-4" />{planWhere(next)}</span>
+                  </p>
+                  {planPoint(next) && (
+                    <PlanMapButton plan={next} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-3.5 text-sm font-semibold text-ink">
+                      <Icon name="map" className="h-4 w-4" /> Show on map
+                    </PlanMapButton>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         <PlanFilters category={category} status={status} extra={{ past: showPast ? "1" : undefined }} />
         <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
           <p className="font-semibold">

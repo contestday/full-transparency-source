@@ -4,11 +4,16 @@ test("landing page shows product name and primary navigation", async ({ page }) 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Full Transparency" })).toBeVisible();
   await expect(page.getByText("Full Picture Location Transparency")).toHaveCount(0);
-  const menuButton = page.getByRole("button", { name: "Open menu" });
-  if (await menuButton.isVisible()) await menuButton.click(); // mobile
-  const nav = page.getByRole("navigation", { name: "Primary" }).filter({ visible: true });
-  for (const label of ["Home", "History", "Plans", "Watch", "Message", "Privacy", "FAQs"]) {
+  // Desktop: the menu in the header (Privacy and FAQs under More). Phones: the bottom tab bar (the rest under More).
+  const desktop = page.getByRole("navigation", { name: "Primary" }).filter({ visible: true });
+  const phone = page.getByRole("navigation", { name: "Main" }).filter({ visible: true });
+  const nav = (await desktop.count()) ? desktop : phone;
+  for (const label of ["Home", "History", "Plans", "Watch"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+  }
+  await nav.getByRole("button", { name: /More/ }).click();
+  for (const label of ["Privacy", "FAQs"]) {
+    await expect(page.getByRole("link", { name: label, exact: true }).filter({ visible: true }).first()).toBeVisible();
   }
 });
 

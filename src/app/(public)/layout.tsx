@@ -3,7 +3,7 @@ import { InstallBanner } from "@/components/pwa";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { JourneyTracker } from "@/components/journey-tracker";
 import { optionalEnv } from "@/lib/env";
-import { ShareButton } from "@/components/share-button";
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
@@ -16,7 +16,9 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
       <SiteFooter />
       <InstallBanner />
       <JourneyTracker />
-      <ShareButton />
+      {/* Phones: the bottom tab bar, and room for it below the footer. */}
+      <div className="ft-tabbar-space lg:hidden" aria-hidden="true" />
+      <BottomTabBar />
     </>
   );
 }

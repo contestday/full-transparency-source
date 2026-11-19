@@ -143,7 +143,7 @@ export function InstallBanner() {
     setLater(true);
   };
   return (
-    <div role="region" aria-label="Install the app" className="fixed inset-x-0 bottom-[4.5rem] z-40 p-3 sm:bottom-24 sm:left-auto sm:right-4 sm:max-w-md sm:p-0">
+    <div role="region" aria-label="Install the app" className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-40 p-3 sm:left-auto sm:right-4 sm:max-w-md lg:bottom-4 lg:p-0">
       <div className="rounded-[var(--ft-radius-card)] border border-border bg-surface p-4 shadow-[0_14px_36px_rgb(20_43_73/22%)]">
         <div className="flex items-start gap-3">
           <Icon name="bell" className="mt-0.5 h-6 w-6 shrink-0 text-accent" />

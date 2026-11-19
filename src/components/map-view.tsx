@@ -17,6 +17,8 @@ export interface MapFeatureProps {
   /** Circle radius in pixels for point features. */
   size?: number;
   opacity?: number;
+  /** A number drawn on a point (matches a numbered card in a list). */
+  num?: number;
 }
 
 export type MapFeature = Feature<Geometry, MapFeatureProps>;
@@ -91,6 +93,15 @@ function addLayers(map: MLMap, id: string) {
       "circle-stroke-color": "#ffffff",
       "circle-stroke-width": 2,
     },
+  });
+  // Numbers on numbered pins.
+  map.addLayer({
+    id: `${id}-num`,
+    type: "symbol",
+    source: id,
+    filter: ["all", ["==", ["geometry-type"], "Point"], ["has", "num"]],
+    layout: { "text-field": ["to-string", ["get", "num"]] as unknown as string, "text-font": ["Noto Sans Bold"], "text-size": 12, "text-allow-overlap": true, "text-ignore-placement": true },
+    paint: { "text-color": "#ffffff" },
   });
 }
 

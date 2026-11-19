@@ -89,6 +89,19 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   chevron: <path d="M9 6l6 6-6 6" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="M16 16l4.5 4.5" />
+    </>
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
+  map: (
+    <>
+      <path d="M9 4L3.5 6v14L9 18l6 2 5.5-2V4L15 6 9 4z" />
+      <path d="M9 4v14M15 6v14" />
+    </>
+  ),
   share: (
     <>
       <circle cx="18" cy="5.5" r="2.5" />
@@ -350,4 +363,34 @@ export function OnTheMove({ status, className }: { status: StatusKey; className?
       On the move
     </span>
   );
+}
+
+/* ------------------------------------------------- engagement refresh */
+
+/** Tint (background) and dark text for each status: status colours always mean a status. */
+export const STATUS_TONE: Record<StatusKey | "blue", { bg: string; ink: string; dot: string; short: string }> = {
+  green: { bg: "var(--green-bg)", ink: "var(--green-ink)", dot: "#007B60", short: "Okay zone" },
+  yellow: { bg: "var(--yellow-bg)", ink: "var(--yellow-ink)", dot: "#D4A900", short: "Outside zone" },
+  amber: { bg: "var(--amber-bg)", ink: "var(--amber-ink)", dot: "#F08C00", short: "Wish area" },
+  red: { bg: "var(--red-bg)", ink: "var(--red-ink)", dot: "#C62828", short: "Noted area" },
+  purple: { bg: "var(--purple-bg)", ink: "var(--purple-ink)", dot: "#7E22CE", short: "Location" },
+  unknown: { bg: "var(--grey-bg)", ink: "var(--grey-ink)", dot: "#64748B", short: "No GPS" },
+  disabled: { bg: "var(--grey-bg)", ink: "var(--grey-ink)", dot: "#64748B", short: "Off" },
+  blue: { bg: "var(--ice)", ink: "#1947B5", dot: "#245AD6", short: "" },
+};
+
+/** A tinted chip with a number and a label, e.g. "23 stays" or "91% in okay zone". */
+export function StatChip({ tone = "blue", value, label, dot = false }: { tone?: StatusKey | "blue"; value: string; label: string; dot?: boolean }) {
+  const t = STATUS_TONE[tone];
+  return (
+    <span className="inline-flex min-h-[30px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold" style={{ background: t.bg, color: t.ink }}>
+      {dot && <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: t.dot }} aria-hidden="true" />}
+      <span className="font-display text-[14px] font-bold tabular-nums">{value}</span> {label}
+    </span>
+  );
+}
+
+/** A shimmering placeholder while something loads (still when reduced motion is on). */
+export function Skeleton({ className }: { className?: string }) {
+  return <span className={cn("ft-skeleton block rounded-xl", className)} aria-hidden="true" />;
 }

@@ -22,9 +22,8 @@ export default async function WatchedHistoryPage({ searchParams }: PageProps<"/h
             Only you see these colours. <Link className="text-accent underline" href={`/history?from=${from}&to=${to}`}>Public view</Link>
           </>
         }
-      >
-        <RangePicker basePath="/history/watched" today={today} from={from} to={to} place={placeQ} />
-      </PageHead>
+      />
+      <RangePicker basePath="/history/watched" today={today} from={from} to={to} place={placeQ} />
       <Container className="space-y-4 pb-20 pt-6">
         <WatchedHistory from={from} to={to} place={placeQ} />
       </Container>

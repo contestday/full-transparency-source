@@ -8,6 +8,7 @@ import { durationText } from "@/lib/area-visits";
 import { gridCellRing } from "@/lib/geo";
 import { useNow } from "@/lib/use-now";
 import { Overlay } from "@/components/overlay";
+import { Skeleton } from "@/components/design";
 import { Button } from "@/components/ui";
 import { StayPlace } from "@/components/stay-place";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
@@ -68,7 +69,7 @@ export function PlaceTimes({ record, name, onClose }: { record: PublicHistoryRec
         <LazyMap features={features} className="h-[220px] w-full sm:h-[260px]" ariaLabel={`Map of ${name}`} />
         <StayPlace lat={record.public_lat} lng={record.public_lng} cellSizeM={record.cell_size_m} label={record.venue_name ?? record.area_label} />
         {failed && <p className="text-sm text-muted">The visits couldn&apos;t be loaded.</p>}
-        {!all && !failed && <p className="text-sm text-muted">Loading…</p>}
+        {!all && !failed && <div className="space-y-2" aria-label="Loading"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>}
         {all && (
           <>
             <p className="text-sm">

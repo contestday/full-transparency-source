@@ -8,6 +8,7 @@ import type { MapFeature } from "@/components/map-lazy";
 import { loadWatchLinks, saveWatchLink } from "@/lib/watch-links";
 import { SaveWatchLink } from "@/components/save-watch-link";
 import { InfoButton } from "@/components/info-button";
+import { Icon } from "@/components/design";
 import { fmtSqMiles, TIER_META, TIER_RULES, type Tier, type WideMode } from "@/lib/geofence/tiers";
 import { destination } from "@/lib/geo";
 
@@ -28,6 +29,14 @@ export interface EditableArea {
   shape: DrawnShape | null;
   distance_m: number | null;
 }
+
+/** One short line per kind, on its card. */
+const TIER_HINT: Record<Tier, string> = {
+  wide: "Somewhere you'd rather I didn't go. A big area.",
+  local: "Somewhere you'd ask me not to go.",
+  location: "A private warning: home, work. Only you see it.",
+};
+const STEPS = ["Kind of place", "Where", "Name and save"] as const;
 
 const TIER_HELP: Record<Tier, string> = {
   wide: `At least a 7.5-mile radius, or a named town, city, county or larger (from ${fmtSqMiles(TIER_RULES.wideMinPlaceM2)}). Not inside another Wish area.`,
@@ -61,6 +70,8 @@ export function GeofenceSubmitForm({
     editing ? (editing.kind === "beyond_home" ? { type: "beyond_home", distance_m: editing.distance_m ?? 3219 } : editing.shape) : null,
   );
   const [busy, setBusy] = useState(false);
+  // Three steps: what kind, where, then name and save (editing starts on "where").
+  const [step, setStep] = useState(editing ? 2 : 1);
   const [error, setError] = useState<string | null>(null);
   const [existing, setExisting] = useState<string | null>(null);
   const [useExisting, setUseExisting] = useState(true);
@@ -105,9 +116,20 @@ export function GeofenceSubmitForm({
     if (t === "location" || tier === "location" || shape?.type === "beyond_home") setShape(null);
   }
 
+  function next() {
+    setError(null);
+    if (step === 2 && (!shape || (shape.type === "polygon" && shape.vertices.length < 3))) {
+      setError(tier === "location" ? "Search for the place or tap the map first." : "Search for a place or draw an area on the map first.");
+      return;
+    }
+    setStep((x) => Math.min(3, x + 1));
+  }
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    // Enter on an earlier step moves on rather than saving.
+    if (step < 3) return next();
     if (!shape || (shape.type === "polygon" && shape.vertices.length < 3)) {
       setError(tier === "location" ? "Search for the place or tap the map first." : "Search for a place or draw an area on the map first.");
       return;
@@ -195,25 +217,49 @@ export function GeofenceSubmitForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Card className="space-y-4">
+      <div className="space-y-2" aria-live="polite">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="font-bold">
+            Step {step} of 3 · {STEPS[step - 1]}
+          </span>
+          {step > 1 && (
+            <button type="button" onClick={() => setStep((x) => Math.max(1, x - 1))} className="font-semibold text-accent">
+              Back
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-3 gap-1.5" aria-hidden="true">
+          {STEPS.map((label, i) => (
+            <span key={label} className={cn("h-1.5 rounded-full", i < step ? "bg-accent" : "bg-blue-100")} />
+          ))}
+        </div>
+      </div>
+
+      <Card className={cn("space-y-4", step !== 1 && "hidden")}>
         <fieldset className="space-y-2">
-          <legend className="mb-2 font-semibold">What kind of area?</legend>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {(Object.keys(TIER_META) as Tier[]).map((t) => (
-              <label
-                key={t}
-                className={cn(
-                  "flex cursor-pointer gap-3 rounded-xl border p-3 text-sm",
-                  tier === t ? "border-2 border-ink bg-sky/40" : "border-border hover:bg-sky/30",
-                )}
-              >
-                <input type="radio" name="tier" className="sr-only" checked={tier === t} onChange={() => chooseTier(t)} />
-                <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full" style={{ background: TIER_META[t].color }} aria-hidden="true" />
-                <span className="font-semibold">
-                  {TIER_META[t].label} <span className="font-normal text-muted">({t === "wide" ? "amber" : t === "local" ? "red" : "purple, private"})</span>
-                </span>
-              </label>
-            ))}
+          <legend className="mb-2 font-semibold">What kind of place?</legend>
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {(Object.keys(TIER_META) as Tier[]).map((t) => {
+              const tone = { wide: { bg: "var(--amber-bg)", ink: "var(--amber-ink)" }, local: { bg: "var(--red-bg)", ink: "var(--red-ink)" }, location: { bg: "var(--purple-bg)", ink: "var(--purple-ink)" } }[t];
+              return (
+                <label
+                  key={t}
+                  className={cn("flex cursor-pointer gap-3 rounded-2xl border-2 p-4 text-sm transition", tier === t ? "shadow-[0_8px_24px_rgb(20_43_73/10%)]" : "border-transparent")}
+                  style={{ background: tone.bg, color: tone.ink, borderColor: tier === t ? TIER_META[t].color : "transparent" }}
+                >
+                  <input type="radio" name="tier" className="sr-only" checked={tier === t} onChange={() => chooseTier(t)} />
+                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white" style={{ background: TIER_META[t].color }} aria-hidden="true">
+                    {tier === t && <span className="h-2 w-2 rounded-full bg-white" />}
+                  </span>
+                  <span>
+                    <span className="block text-base font-bold text-ink">
+                      {TIER_META[t].label} <span className="text-sm font-semibold" style={{ color: tone.ink }}>({t === "wide" ? "amber" : t === "local" ? "red" : "purple"})</span>
+                    </span>
+                    <span className="block">{TIER_HINT[t]}</span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
           <InfoButton label="Which should I choose?">
             {(Object.keys(TIER_META) as Tier[]).map((t) => (
@@ -260,6 +306,7 @@ export function GeofenceSubmitForm({
         )}
       </Card>
 
+      {step === 2 && (
       <Card>
         <GeofenceDrawer key={tier} value={shape} onChange={setShape} tier={tier} wideMode={mode} context={context ?? (useExisting ? savedAreas : undefined)} />
         {needsOffset && (
@@ -287,7 +334,8 @@ export function GeofenceSubmitForm({
           </div>
         )}
       </Card>
-      <Card className="space-y-4">
+      )}
+      <Card className={cn("space-y-4", step !== 3 && "hidden")}>
         <Field label="Name for this area (optional, only you see it)" htmlFor="name">
           <Input id="name" name="name" maxLength={200} placeholder="e.g. My street" defaultValue={editing?.name} />
         </Field>
@@ -312,10 +360,16 @@ export function GeofenceSubmitForm({
           this one ends at the same moment: both are kept in the dated record.
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="lg" disabled={busy}>
-          {busy ? "Saving…" : editing ? "Save changes" : watchToken ? "Add area" : "Save area and get my watch link"}
-        </Button>
+      <div className="sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-wrap gap-2 border-t border-hairline bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 lg:bottom-0">
+        {step < 3 ? (
+          <Button type="button" size="lg" className="flex-1 sm:flex-none" onClick={next}>
+            Next <Icon name="chevron" className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button type="submit" size="lg" className="flex-1 sm:flex-none" disabled={busy}>
+            {busy ? "Saving…" : editing ? "Save changes" : watchToken ? "Add area" : "Save and get my watch link"}
+          </Button>
+        )}
         {onCancel && (
           <Button type="button" size="lg" variant="secondary" onClick={onCancel}>
             Cancel

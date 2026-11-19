@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
-import { EmptyState, Icon, LegendItem, MapFrame } from "@/components/design";
+import { EmptyState, Icon, LegendItem, MapFrame, STATUS_TONE, StatChip } from "@/components/design";
 import { cn } from "@/components/ui";
-import { cardColour, onZone } from "@/components/zone-card";
+import { cardColour } from "@/components/zone-card";
 import { gridCellRing } from "@/lib/geo";
 import { categoryLabel } from "@/lib/plans";
 import { BASE_ZONE_LABEL, WATCH_ZONE_LABEL, ZONE_COLOR, type BaseZone, type WatchZone, type Zone } from "@/lib/geofence/tiers";
@@ -27,6 +27,47 @@ function duration(from: string, to: string | null): string {
 const stayName = (r: { venue_name: string | null; area_label: string | null; cell_size_m: number }) =>
   r.venue_name ?? r.area_label ?? (r.cell_size_m ? "Approximate area" : "Stop");
 const SELECTED = "#142B49";
+
+/** Minutes since London midnight. */
+const londonMinutes = (iso: string) => {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(iso));
+  return Number(p.find((x) => x.type === "hour")?.value ?? 0) * 60 + Number(p.find((x) => x.type === "minute")?.value ?? 0);
+};
+
+/** Status key for a card colour (for tints): base zones and the watcher's own. */
+const toneOf = (key: string | null) => (key === "green" || key === "yellow" || key === "red" || key === "amber" || key === "purple" ? key : "unknown");
+
+/**
+ * A day as a 24-hour bar: each stay in its colour, the rest light grey
+ * (travelling, or nothing published). Text alternative in its label.
+ */
+function DayRibbon({ stays, colourOf }: { stays: PublicHistoryRecord[]; colourOf: (r: PublicHistoryRecord) => string }) {
+  const segs = [...stays]
+    .sort((a, b) => a.observed_at.localeCompare(b.observed_at))
+    .map((r) => {
+      const start = londonMinutes(r.observed_at);
+      const endRaw = r.observed_until ? londonMinutes(r.observed_until) : start + 10;
+      const end = r.observed_until && londonDayKey(r.observed_until) !== londonDayKey(r.observed_at) ? 1440 : Math.max(endRaw, start + 4);
+      return { start, end, color: colourOf(r), name: stayName(r) };
+    });
+  const label = segs.length ? `Stays this day: ${segs.map((x) => `${x.name} ${String(Math.floor(x.start / 60)).padStart(2, "0")}:${String(x.start % 60).padStart(2, "0")}`).join(", ")}` : "No stays this day";
+  return (
+    <div className="mb-3">
+      <div className="relative h-2.5 overflow-hidden rounded-full bg-grey-bg" role="img" aria-label={label}>
+        {segs.map((x, i) => (
+          <span key={i} className="absolute inset-y-0" style={{ left: `${(x.start / 1440) * 100}%`, width: `${((x.end - x.start) / 1440) * 100}%`, background: x.color }} />
+        ))}
+      </div>
+      <div className="mt-0.5 flex justify-between text-[11px] text-muted tabular-nums" aria-hidden="true">
+        <span>00:00</span>
+        <span>06:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
+      </div>
+    </div>
+  );
+}
 const NEUTRAL = "#245AD6";
 
 /**
@@ -83,15 +124,15 @@ export function HistoryView({
       ]
         .filter(Boolean)
         .join("\n");
-      if (r.venue_name || r.cell_size_m === 0) {
-        f.push({ type: "Feature", geometry: { type: "Point", coordinates: [r.public_lng, r.public_lat] }, properties: { color, size: on ? 10 : 8, label } });
-      } else {
+      if (!(r.venue_name || r.cell_size_m === 0)) {
         f.push({
           type: "Feature",
           geometry: { type: "Polygon", coordinates: [gridCellRing({ lat: r.public_lat, lng: r.public_lng }, r.cell_size_m)] },
-          properties: { color, opacity: on ? 0.45 : 0.16, dashed: !on, label },
+          properties: { color, opacity: on ? 0.3 : 0.1, dashed: true, label },
         });
       }
+      // A numbered pin, matching the numbered card in the timeline.
+      f.push({ type: "Feature", geometry: { type: "Point", coordinates: [r.public_lng, r.public_lat] }, properties: { color, size: on ? 14 : 11, num: i + 1, label } });
     });
     return f;
   }, [route, visits, selected, stopZones, watchZones, homeArea, searchArea]);
@@ -100,6 +141,26 @@ export function HistoryView({
   const searchFocus = useMemo(() => (searchArea ? { key: 1, features: [{ type: "Feature", geometry: searchArea, properties: {} } as MapFeature] } : null), [searchArea]);
 
   const [timesFor, setTimesFor] = useState<PublicHistoryRecord | null>(null);
+  // "Show on map": zoom to one stay.
+  const [pinFocus, setPinFocus] = useState<{ key: number; features: MapFeature[] } | null>(null);
+  const showOnMap = (r: PublicHistoryRecord) =>
+    setPinFocus((p) => ({ key: (p?.key ?? 0) + 1, features: [{ type: "Feature", geometry: { type: "Point", coordinates: [r.public_lng, r.public_lat] }, properties: {} }] }));
+
+  // The period in numbers: stays, places, and how much stay time was within the okay zone.
+  const stats = useMemo(() => {
+    const places = new Set(visits.map((v) => stayName(v).toLowerCase())).size;
+    let total = 0;
+    let okay = 0;
+    for (const v of visits) {
+      if (!v.observed_until) continue;
+      const ms = Date.parse(v.observed_until) - Date.parse(v.observed_at);
+      if (!(ms > 0)) continue;
+      total += ms;
+      if (stopZones[v.id] === "green") okay += ms;
+    }
+    return { stays: visits.length, places, okayPct: total > 0 ? Math.round((okay / total) * 100) : null };
+  }, [visits, stopZones]);
+  const colourOf = (r: PublicHistoryRecord) => cardColour(stopZones[r.id] ?? null, watchZones?.[r.id] ?? null).color;
 
   const days = useMemo(() => {
     const m = new Map<string, { visits: PublicHistoryRecord[]; samples: number }>();
@@ -146,7 +207,7 @@ export function HistoryView({
             <LazyMap
               features={features}
               fit={searchArea ? false : true}
-              focus={searchFocus}
+              focus={pinFocus ?? searchFocus}
               className="h-[300px] w-full sm:h-[460px] lg:h-[620px]" ariaLabel="Map of published movement: routes and stays" />
           </MapFrame>
         </div>
@@ -154,6 +215,13 @@ export function HistoryView({
 
       {timesFor && <PlaceTimes record={timesFor} name={stayName(timesFor)} onClose={() => setTimesFor(null)} />}
       <div className="min-w-0 grow-[5] basis-[380px] space-y-6" aria-label="Chronological timeline">
+        {records.length > 0 && (
+          <div className="ft-scroll-x -mx-1 flex gap-2 px-1">
+            <StatChip value={String(stats.stays)} label={stats.stays === 1 ? "stay" : "stays"} />
+            <StatChip value={String(stats.places)} label={stats.places === 1 ? "place" : "places"} />
+            {stats.okayPct != null && <StatChip tone="green" dot value={`${stats.okayPct}%`} label="of stay time in okay zone" />}
+          </div>
+        )}
         {!records.length && (
           <EmptyState icon="history" title="No published records for these dates.">
             Usually this means I stayed near home, which is never shown. Try a different date range.
@@ -161,50 +229,64 @@ export function HistoryView({
         )}
         {days.map(([day, d]) => (
           <section key={day}>
-            <div className="sticky top-16 z-10 -mx-1 flex items-baseline justify-between bg-background px-1 py-2 lg:top-[72px]">
+            <div className="-mx-1 flex items-baseline justify-between px-1 pb-1 pt-2">
               <h2 className="text-lg font-bold">{fmtDate(`${day}T12:00:00Z`, { dateStyle: "full" })}</h2>
               <span className="text-xs text-muted">
                 {d.visits.length} stay{d.visits.length === 1 ? "" : "s"}
                 {d.samples ? ` · route recorded` : ""}
               </span>
             </div>
+            <DayRibbon stays={d.visits} colourOf={colourOf} />
             {d.visits.length ? (
-              <ol className="space-y-3">
+              <ol className="space-y-2.5">
                 {d.visits.map((r) => {
                   const on = r.id === selected;
                   // One colour per card: the watcher's own, or else everyone's.
                   const c = cardColour(stopZones[r.id] ?? null, watchZones?.[r.id] ?? null);
-                  const card = (
-                    <button
-                      type="button"
-                      onClick={() => setSelected(on ? null : r.id)}
-                      aria-pressed={on}
-                      className={cn("block w-full overflow-hidden rounded-xl border-2 text-left text-sm transition", on && "ring-2 ring-ink ring-offset-2")}
-                      style={{ borderColor: c.color, background: c.key ? `color-mix(in srgb, ${c.color} 9%, #fff)` : "#fff" }}
-                    >
-                      <span className="flex items-center gap-2 px-3 py-2 font-semibold" style={{ background: c.key ? c.color : "#E6EEF7", color: onZone(c.key) }}>
-                        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/90 text-xs font-bold text-ink tabular-nums">
+                  const tone = STATUS_TONE[toneOf(c.key)];
+                  return (
+                    <li key={r.id} className={cn("rounded-2xl border bg-white transition", on ? "border-2 border-ink shadow-[0_8px_24px_rgb(20_43_73/10%)]" : "border-hairline")}>
+                      <button type="button" onClick={() => setSelected(on ? null : r.id)} aria-pressed={on} className="flex w-full items-center gap-3 p-3 text-left">
+                        <span
+                          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-white text-[13px] font-bold text-white tabular-nums shadow-[0_0_0_1px_#C5D6E5]"
+                          style={{ background: c.key ? c.color : NEUTRAL }}
+                        >
                           {numberOf.get(r.id)}
                         </span>
-                        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{stayName(r)}</span>
-                        {c.label && <span className="hidden text-xs font-semibold sm:inline">{c.label}</span>}
-                      </span>
-                      <span className="block px-3 py-2 text-ink/80 tabular-nums">
-                        {fmtTime(r.observed_at)}
-                        {r.observed_until ? `–${fmtTime(r.observed_until)}` : ""}
-                        {duration(r.observed_at, r.observed_until) ? ` · ${duration(r.observed_at, r.observed_until)}` : ""}
-                        {r.category ? ` · ${categoryLabel(r.category)}` : ""}
-                        {c.label && <span className="block text-xs sm:hidden">{c.label}</span>}
-                      </span>
-                    </button>
-                  );
-                  return (
-                    <li key={r.id}>
-                      {card}
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-bold [overflow-wrap:anywhere]">{stayName(r)}</span>
+                          <span className="block text-[13px] text-muted tabular-nums">
+                            {fmtTime(r.observed_at)}
+                            {r.observed_until ? ` – ${fmtTime(r.observed_until)}` : ""}
+                            {duration(r.observed_at, r.observed_until) ? ` · ${duration(r.observed_at, r.observed_until)}` : ""}
+                            {r.category ? ` · ${categoryLabel(r.category)}` : ""}
+                          </span>
+                        </span>
+                        {c.label && (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" style={{ background: tone.bg, color: tone.ink }}>
+                            <span className="h-2 w-2 rounded-full" style={{ background: c.color }} aria-hidden="true" />
+                            <span className="max-w-[9rem] truncate">{c.label}</span>
+                          </span>
+                        )}
+                      </button>
                       {on && (
-                        <button type="button" onClick={() => setTimesFor(r)} className="mt-1 inline-flex h-9 items-center gap-1.5 rounded-[var(--ft-radius-control)] border border-border bg-white px-3 text-sm font-semibold hover:bg-sky">
-                          <Icon name="clock" className="h-4 w-4 text-accent" /> All times here
-                        </button>
+                        <div className="flex gap-2 px-3 pb-3">
+                          <button
+                            type="button"
+                            onClick={() => setTimesFor(r)}
+                            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-[15px] font-semibold text-white hover:bg-accent-hover"
+                          >
+                            <Icon name="clock" className="h-5 w-5" /> All times here
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Show on map"
+                            onClick={() => showOnMap(r)}
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-white"
+                          >
+                            <Icon name="map" />
+                          </button>
+                        </div>
                       )}
                     </li>
                   );

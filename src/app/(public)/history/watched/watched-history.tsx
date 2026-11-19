@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { EmptyState } from "@/components/design";
+import { EmptyState, Skeleton } from "@/components/design";
 import { Notice } from "@/components/ui";
 import { loadWatchLinks } from "@/lib/watch-links";
 import type { PublicHistoryRecord } from "@/lib/public-data";
@@ -60,7 +60,18 @@ export function WatchedHistory({ from, to, place = "", token: givenToken }: { fr
     );
   }
   if (state === "error") return <Notice tone="red">Your watched history could not be loaded. Please try again later.</Notice>;
-  if (state === "loading" || !data) return <p className="text-sm text-muted">Loading your watched history…</p>;
+  if (state === "loading" || !data)
+    return (
+      <div className="flex flex-wrap gap-6" aria-label="Loading your history">
+        <Skeleton className="h-[300px] min-w-0 grow-[7] basis-[520px] sm:h-[460px]" />
+        <div className="min-w-0 grow-[5] basis-[380px] space-y-3">
+          <Skeleton className="h-8 w-2/3" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+          <Skeleton className="h-16" />
+        </div>
+      </div>
+    );
   return (
     <>
       {!data.areaCount && <Notice tone="blue">Your watch link has no areas yet, so this matches the public history.</Notice>}
