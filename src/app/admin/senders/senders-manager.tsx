@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Badge, Button, Card, Input, Notice } from "@/components/ui";
 import { api } from "@/lib/client-api";
 import { fmtDateTime } from "@/lib/format";
+import { IgnoreIpButton } from "../ignore-ip";
 
 export interface Sender {
   hash: string;
@@ -85,6 +86,7 @@ export function SendersManager({
                 </p>
                 {s.wideRefs.length > 0 && <p className="text-xs text-muted">Wish/Want areas: {s.wideRefs.slice(0, 6).join(", ")}</p>}
               </div>
+              <IgnoreIpButton hash={s.hash} label={`Sender ${s.countries[0] ?? ""} (last ${fmtDateTime(s.last)})`.replace("  ", " ")} />
               {s.blocked ? (
                 <Button size="sm" variant="secondary" onClick={() => post({ action: "unblock", submitter_hash: s.hash }, "Unblocked")}>
                   Unblock

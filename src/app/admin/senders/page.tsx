@@ -3,6 +3,8 @@ import { PageHeader } from "@/components/ui";
 import { createServiceClient } from "@/lib/supabase/server";
 import { loadSubmissionRules } from "@/lib/submission-guard";
 import { SendersManager, type Sender } from "./senders-manager";
+import { currentIpHash, loadIgnoredIps } from "@/lib/ignored-ips";
+import { IgnoredIps } from "../ignore-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,7 @@ export default async function SendersPage() {
   await requirePageRole(["admin"]);
   const db = createServiceClient();
   const since = new Date(new Date().getTime() - 90 * 86_400_000).toISOString();
-  const [{ data: fences }, { data: reports }, { data: blocked }, rules] = await Promise.all([
+  const [{ data: fences }, { data: reports }, { data: blocked }, rules, ignored, myHash] = await Promise.all([
     db
       .from("geofences")
       .select("reference, tier, submitted_at, submitter_hash, submitter_country")
@@ -24,7 +26,10 @@ export default async function SendersPage() {
     db.from("incident_reports").select("created_at, submitter_hash, submitter_country").gte("created_at", since).limit(2000),
     db.from("blocked_submitters").select("submitter_hash, country, reason, created_at"),
     loadSubmissionRules(),
+    loadIgnoredIps(),
+    currentIpHash(),
   ]);
+  const skip = new Set(ignored.map((i) => i.hash));
   const by = new Map<string, Sender>();
   const get = (hash: string) => {
     let s = by.get(hash);
@@ -53,13 +58,16 @@ export default async function SendersPage() {
   }
   const blockedSet = new Set((blocked ?? []).map((b) => b.submitter_hash as string));
   for (const s of by.values()) s.blocked = blockedSet.has(s.hash);
-  const senders = [...by.values()].sort((a, b) => b.last.localeCompare(a.last));
+  const hidden = [...by.keys()].filter((h) => skip.has(h)).length;
+  const senders = [...by.values()].filter((s) => !skip.has(s.hash)).sort((a, b) => b.last.localeCompare(a.last));
   return (
     <div className="space-y-4">
       <PageHeader
         title="Senders"
         description="Who has submitted areas or notes in the last 90 days: country and an anonymous fingerprint of their IP address only. Private areas' contents are never shown."
       />
+      <IgnoredIps list={ignored} currentHash={myHash} />
+      {hidden > 0 && <p className="text-xs text-muted">{hidden} ignored sender{hidden === 1 ? "" : "s"} hidden (still recorded).</p>}
       <SendersManager
         senders={senders}
         blocked={(blocked ?? []) as { submitter_hash: string; country: string | null; reason: string | null; created_at: string }[]}

@@ -3,6 +3,8 @@ import { requirePageRole } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fmtDateTime, fmtTime } from "@/lib/format";
+import { currentIpHash, loadIgnoredIps } from "@/lib/ignored-ips";
+import { IgnoredIps, IgnoreIpButton } from "../ignore-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,9 @@ interface Ev {
   path: string | null;
   detail: string | null;
   country: string | null;
+  ip_hash: string | null;
+  owner_device: boolean | null;
+  automated: string | null;
 }
 
 const flag = (cc: string | null) => (cc ? `${String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))} ${cc}` : "—");
@@ -32,13 +37,23 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
   const sp = await searchParams;
   const days = RANGES.some((r) => r.key === sp.days) ? Number(sp.days) : 1;
   const since = new Date(new Date().getTime() - days * 86_400_000).toISOString();
-  const { data } = await createServiceClient()
-    .from("site_events")
-    .select("visit_id, at, kind, path, detail, country")
-    .gte("at", since)
-    .order("at", { ascending: true })
-    .limit(20000);
-  const events = (data ?? []) as Ev[];
+  const [{ data }, ignored, myHash] = await Promise.all([
+    createServiceClient()
+      .from("site_events")
+      .select("visit_id, at, kind, path, detail, country, ip_hash, owner_device, automated")
+      .gte("at", since)
+      .order("at", { ascending: true })
+      .limit(20000),
+    loadIgnoredIps(),
+    currentIpHash(),
+  ]);
+  const skip = new Set(ignored.map((i) => i.hash));
+  const all = (data ?? []) as Ev[];
+  // Your own visits and automated checks are recorded, just hidden here.
+  const autoVisits = new Set(all.filter((e) => e.automated).map((e) => e.visit_id));
+  const mineVisits = new Set(all.filter((e) => !autoVisits.has(e.visit_id) && (e.owner_device || (e.ip_hash && skip.has(e.ip_hash)))).map((e) => e.visit_id));
+  const hiddenVisits = new Set([...autoVisits, ...mineVisits]);
+  const events = all.filter((e) => !hiddenVisits.has(e.visit_id));
 
   const visits = new Map<string, Ev[]>();
   for (const e of events) visits.set(e.visit_id, [...(visits.get(e.visit_id) ?? []), e]);
@@ -59,8 +74,15 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
     <div className="space-y-4">
       <PageHeader
         title="Journeys"
-        description="Anonymous visits to the public site: pages, taps and error messages, with times. No names or IP addresses; each visit has a random ID that changes every visit. Kept for 30 days."
+        description="Anonymous visits to the public site: pages, taps and error messages, with times. No names or IP addresses (only a scrambled fingerprint); each visit has a random ID that changes every visit. Kept for 30 days."
       />
+      <IgnoredIps list={ignored} currentHash={myHash} />
+      {hiddenVisits.size > 0 && (
+        <p className="text-xs text-muted">
+          Hidden here (still recorded): {mineVisits.size} visit{mineVisits.size === 1 ? "" : "s"} of yours · {autoVisits.size} automated check
+          {autoVisits.size === 1 ? "" : "s"} (Vercel, test browsers, bots).
+        </p>
+      )}
       <div className="flex flex-wrap gap-2 text-sm">
         {RANGES.map((r) => (
           <Link
@@ -121,6 +143,15 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
                       .join(" → ")}
                   </span>
                 </summary>
+                {(() => {
+                  const h = v.evs.find((e) => e.ip_hash)?.ip_hash;
+                  return h ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+                      <span className="font-mono">IP …{h.slice(-8)}</span>
+                      <IgnoreIpButton hash={h} label={`Visit ${fmtDateTime(v.start)}`} />
+                    </div>
+                  ) : null;
+                })()}
                 <ol className="mt-2 space-y-1 border-l-2 border-hairline pl-3 text-xs">
                   {v.evs.map((e, i) => (
                     <li key={i} className={e.kind === "error" ? "text-red-700" : e.kind === "page" ? "font-semibold" : "text-muted"}>

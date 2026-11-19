@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { isOwnerDevice } from "@/lib/owner-device";
 
 /**
  * Anonymous journey log for the public site. Records, for one visit:
@@ -40,7 +41,7 @@ export function JourneyTracker() {
     const events = queue.current.splice(0, 40);
     const id = visitId();
     if (!events.length || !id) return;
-    const payload = JSON.stringify({ visit_id: id, events });
+    const payload = JSON.stringify({ visit_id: id, events, ...(isOwnerDevice() ? { own: true } : {}), ...(navigator.webdriver ? { auto: true } : {}) });
     if (!navigator.sendBeacon?.("/api/events", new Blob([payload], { type: "application/json" }))) {
       fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: true }).catch(() => undefined);
     }

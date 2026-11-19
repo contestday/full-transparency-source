@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePageRole } from "@/lib/auth";
 import { SignOutButton } from "./sign-out";
+import { MarkOwnerDevice } from "./ignore-ip";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { optionalEnv } from "@/lib/env";
 
@@ -29,6 +30,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const nav = role === "admin" ? ADMIN_NAV : ADMIN_NAV.filter((n) => REVIEWER_NAV.includes(n.href));
   return (
     <div className="flex min-h-full flex-1 flex-col">
+      <MarkOwnerDevice />
       <header className="sticky top-0 z-20 border-b border-border bg-slate-900 text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 py-2">
           <Link href="/admin" className="font-semibold">
