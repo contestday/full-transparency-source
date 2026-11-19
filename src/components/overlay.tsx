@@ -2,6 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
+/** A "back" waiting to run after a panel closed (cancelled if a panel opens straight away, as in React's development double-run). */
+let pendingBack: ReturnType<typeof setTimeout> | null = null;
+
 /**
  * A panel over the page (not a new page). On phones it's a sheet that rises
  * from the bottom: drag it down, tap outside, press Escape or the back button
@@ -25,7 +28,10 @@ export function Overlay({ title, onClose, children, wide = false, id }: { title:
     panel.current?.focus();
     // The back button closes the panel rather than leaving the page.
     let closedByBack = false;
-    history.pushState({ ftOverlay: true }, "");
+    if (pendingBack) {
+      clearTimeout(pendingBack);
+      pendingBack = null;
+    } else history.pushState({ ftOverlay: true }, "");
     const onPop = () => {
       closedByBack = true;
       close.current();
@@ -35,7 +41,12 @@ export function Overlay({ title, onClose, children, wide = false, id }: { title:
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
       document.body.style.overflow = overflow;
-      if (!closedByBack && history.state?.ftOverlay) history.back();
+      if (!closedByBack && history.state?.ftOverlay) {
+        pendingBack = setTimeout(() => {
+          pendingBack = null;
+          history.back();
+        }, 0);
+      }
     };
   }, []);
 
@@ -68,7 +79,7 @@ export function Overlay({ title, onClose, children, wide = false, id }: { title:
         aria-labelledby={titleId}
         tabIndex={-1}
         style={drag ? { transform: `translateY(${drag}px)` } : undefined}
-        className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface shadow-xl outline-none transition-transform sm:rounded-3xl ${wide ? "sm:max-w-3xl" : "sm:max-w-xl"}`}
+        className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-3xl bg-surface text-ink shadow-xl outline-none transition-transform sm:rounded-3xl ${wide ? "sm:max-w-3xl" : "sm:max-w-xl"}`}
       >
         <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="touch-none">
           <div className="flex justify-center pt-2 sm:hidden" aria-hidden="true">

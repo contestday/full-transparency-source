@@ -233,7 +233,7 @@ export function AreaVisits({
                             </>
                           ) : it.stay ? (
                             <>
-                              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                              <span className="min-w-0 flex-1 basis-48 [overflow-wrap:anywhere]">
                                 <span className="font-semibold">Stayed</span> · {it.stay.name}
                                 {watchedSec && (
                                   <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: ZONE_COLOR[it.stay.zone] }}>
