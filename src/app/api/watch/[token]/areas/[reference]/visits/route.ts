@@ -2,7 +2,9 @@ import { handle, HttpError, json } from "@/lib/http";
 import { enforceRateLimits } from "@/lib/rate-limit";
 import { createServiceClient } from "@/lib/supabase/server";
 import { findWatcher, loadOwnerProfile } from "@/lib/watchers";
-import { loadWatchAreas } from "@/lib/watch-areas";
+import { loadWatchAreas, zoneAreas } from "@/lib/watch-areas";
+import { loadPublicZoneContext } from "@/lib/zones";
+import { zoneAt } from "@/lib/geofence/tiers";
 import { getPublicHistory } from "@/lib/public-data";
 import { pointInArea, type AreaGeometry } from "@/lib/geofence/area-geometry";
 import { historyRange } from "@/lib/history-range";
@@ -82,7 +84,7 @@ export const GET = handle(async (request: Request, ctx: Ctx) => {
 
   const startIso = `${from}T00:00:00Z`;
   const endIso = `${to}T23:59:59.999Z`;
-  const [{ data: events }, { data: ended }, { data: state }, history, owner] = await Promise.all([
+  const [{ data: events }, { data: ended }, { data: state }, history, owner, zctx] = await Promise.all([
     supabase
       .from("geofence_events")
       .select("geofence_id, event_type, observed_at, accuracy_m")
@@ -98,6 +100,7 @@ export const GET = handle(async (request: Request, ctx: Ctx) => {
     // Stays inside the area (published stays only; not for "anywhere beyond home", whose circle stays private).
     outside ? Promise.resolve(null) : getPublicHistory(startIso, endIso, { stopsOnly: true }),
     loadOwnerProfile(),
+    loadPublicZoneContext(),
   ]);
 
   const endOf = new Map<string, string>();
@@ -119,9 +122,21 @@ export const GET = handle(async (request: Request, ctx: Ctx) => {
     accuracy_m: e.accuracy_m == null ? null : Math.round(Number(e.accuracy_m)),
     reference: refOf.get(e.geofence_id as string) ?? reference,
   }));
+  const zAreas = zoneAreas(areas);
   const stays = (history?.records ?? [])
     .filter((r) => r.kind === "visit" && pointInArea({ lat: r.public_lat, lng: r.public_lng }, area.geometry))
-    .map((r) => ({ name: r.venue_name ?? r.area_label ?? "A stop", from: r.observed_at, until: r.observed_until }));
+    .map((r) => ({
+      name: r.venue_name ?? r.area_label ?? "A stop",
+      area_label: r.area_label,
+      from: r.observed_at,
+      until: r.observed_until,
+      lat: r.public_lat,
+      lng: r.public_lng,
+      /** 0 = exact position (a public place); otherwise the side of the published square. */
+      cell_size_m: r.cell_size_m,
+      // The colour this stay actually had for this watcher (a Location inside a Want area is purple).
+      zone: zoneAt({ lat: r.public_lat, lng: r.public_lng }, zctx.okay, zAreas, zctx.own, Date.parse(r.observed_at)),
+    }));
 
   return json(
     {

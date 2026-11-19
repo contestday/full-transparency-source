@@ -7,7 +7,8 @@ import { categoryLabel, STATUS_LABELS, type PlanStatus } from "@/lib/plans";
 import type { PublicPlan } from "@/lib/public-data";
 import { fmtDate } from "@/lib/format";
 
-export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full" }: { plans: PublicPlan[]; className?: string }) {
+/** `context`: areas drawn underneath (e.g. the viewer's own areas); the map still zooms to the plans. */
+export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full", context }: { plans: PublicPlan[]; className?: string; context?: MapFeature[] }) {
   const features = useMemo<MapFeature[]>(
     () =>
       plans.flatMap((p) => [p, ...p.extra_locations.filter((l) => l.public_lat != null).map((l) => ({ ...p, public_lat: l.public_lat, public_lng: l.public_lng, public_cell_size_m: l.public_cell_size_m, venue_name: l.venue_name, public_area_label: l.area_label }))]).filter((p) => p.public_lat != null).map((p) => {
@@ -36,5 +37,7 @@ export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full" }: { pl
       }),
     [plans],
   );
-  return <LazyMap features={features} className={className} ariaLabel="Plans map" />;
+  const all = useMemo(() => (context?.length ? [...context, ...features] : features), [context, features]);
+  const focus = useMemo(() => (context?.length ? { key: 1, features } : null), [context, features]);
+  return <LazyMap features={all} fit={context?.length ? false : true} focus={focus} className={className} ariaLabel="Plans map" />;
 }

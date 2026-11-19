@@ -6,7 +6,10 @@ import { Button, Notice } from "@/components/ui";
 import { coverageSections, durationText, flaggedPeriods, periodMeaning, sectionIndex, type Coverage, type EvidenceEvent, type EvidencePeriod, type Section } from "@/lib/area-visits";
 import { quickRanges } from "@/lib/history-range";
 import { fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
-import { TIER_META, type Tier } from "@/lib/geofence/tiers";
+import { TIER_META, ZONE_COLOR, ZONE_LABEL, type Tier, type Zone } from "@/lib/geofence/tiers";
+import { LazyMap, type MapFeature } from "@/components/map-lazy";
+import { StayPlace } from "@/components/stay-place";
+import type { Geometry } from "geojson";
 import { useNow } from "@/lib/use-now";
 
 /**
@@ -24,14 +27,32 @@ interface Visits {
   coverage: Coverage[];
   events: EvidenceEvent[];
   inside_now: boolean;
-  stays: { name: string; from: string; until: string | null }[];
+  stays: { name: string; area_label: string | null; from: string; until: string | null; lat: number; lng: number; cell_size_m: number; zone: Zone }[];
 }
 
 const sameDayTime = (from: string, until: string | null) =>
   until ? (londonDayKey(from) === londonDayKey(until) ? `${fmtDateTime(from)} – ${fmtTime(until)}` : `${fmtDateTime(from)} – ${fmtDateTime(until)}`) : fmtDateTime(from);
 
 /** Every time I entered, left or stayed in one of the watcher's areas, for a chosen period. */
-export function AreaVisits({ token, reference, name, tier, onClose }: { token: string; reference: string; name: string; tier: Tier; onClose: () => void }) {
+/** Strongest first: a Location inside a Want area shows purple. */
+const ZONE_RANK: Zone[] = ["purple", "red", "amber", "yellow", "green"];
+
+export function AreaVisits({
+  token,
+  reference,
+  name,
+  tier,
+  geojson,
+  onClose,
+}: {
+  token: string;
+  reference: string;
+  name: string;
+  tier: Tier;
+  /** The area's shape, for the map (none for "anywhere beyond home"). */
+  geojson: Geometry | null;
+  onClose: () => void;
+}) {
   const now = useNow();
   const today = now ? londonDayKey(new Date(now).toISOString()) : null;
   const [rangeKey, setRangeKey] = useState("all");
@@ -87,10 +108,28 @@ export function AreaVisits({ token, reference, name, tier, onClose }: { token: s
     return buckets.filter((b) => b.items.length || b.sec.kind === "since");
   }, [data, periods]);
 
-  const heading = (sec: Section) => {
+  const strongest = (items: Item[]) => {
+    const zones = items.map((it) => (it.stay ? it.stay.zone : null)).filter((z): z is Zone => Boolean(z));
+    const z = ZONE_RANK.find((k) => zones.includes(k));
+    return z ? ZONE_COLOR[z] : color;
+  };
+  // The area, with each stay: in its real colour while watched, grey before.
+  const mapFeatures = useMemo<MapFeature[]>(() => {
+    const f: MapFeature[] = geojson ? [{ type: "Feature", geometry: geojson, properties: { color, opacity: 0.18, label } }] : [];
+    if (!data) return f;
+    const sections = coverageSections(data.coverage);
+    for (const st of data.stays) {
+      const k = sections[sectionIndex(sections, st.from)].kind;
+      const c = k === "since" || k === "watched" ? ZONE_COLOR[st.zone] : "#64748B";
+      f.push({ type: "Feature", geometry: { type: "Point", coordinates: [st.lng, st.lat] }, properties: { color: c, size: 6, label: `${st.name}\n${sameDayTime(st.from, st.until)}` } });
+    }
+    return f;
+  }, [geojson, data, color, label]);
+
+  const heading = (sec: Section, items: Item[]) => {
     const range = (a: string | null, b: string | null) => `${a ? fmtDateTime(a) : "the start"} to ${b ? fmtDateTime(b) : "now"}`;
-    if (sec.kind === "since") return { text: `Since geofenced · from ${fmtDateTime(sec.from)}`, color };
-    if (sec.kind === "watched") return { text: `Geofenced · ${range(sec.from, sec.until)}`, color };
+    if (sec.kind === "since") return { text: `Since geofenced · from ${fmtDateTime(sec.from)}`, color: strongest(items) };
+    if (sec.kind === "watched") return { text: `Geofenced · ${range(sec.from, sec.until)}`, color: strongest(items) };
     if (sec.kind === "gap") return { text: `Not tracked: geofence paused or removed · ${range(sec.from, sec.until)}`, color: "#64748B" };
     return { text: sec.until ? `Prior to geofence · before ${fmtDateTime(sec.until)}` : "Prior to geofence", color: "#64748B" };
   };
@@ -129,6 +168,10 @@ export function AreaVisits({ token, reference, name, tier, onClose }: { token: s
               </p>
             </div>
 
+            <div className="print:hidden">
+              <LazyMap features={mapFeatures} className="h-[240px] w-full sm:h-[300px]" ariaLabel={`Map of ${label} and the stays recorded in it`} />
+            </div>
+
             <p className="text-sm">
               While geofenced: <strong>{watched.length}</strong> {watched.length === 1 ? "time" : "times"} recorded as “{meaning.state.toLowerCase()}”
               {total > 0 ? `, ${durationText(new Date(0).toISOString(), new Date(total).toISOString(), 0)} in all` : ""}.
@@ -136,7 +179,8 @@ export function AreaVisits({ token, reference, name, tier, onClose }: { token: s
             </p>
 
             {grouped.map(({ sec, items }) => {
-              const h = heading(sec);
+              const h = heading(sec, items);
+              const watchedSec = sec.kind === "since" || sec.kind === "watched";
               return (
                 <section key={`${sec.kind}-${sec.from}`} className="space-y-1">
                   <h3 className="border-l-4 pl-2 text-sm font-bold" style={{ borderColor: h.color, color: h.color }}>
@@ -168,8 +212,15 @@ export function AreaVisits({ token, reference, name, tier, onClose }: { token: s
                             </>
                           ) : it.stay ? (
                             <>
-                              <span className="[overflow-wrap:anywhere]">
+                              <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                                 <span className="font-semibold">Stayed</span> · {it.stay.name}
+                                {watchedSec && (
+                                  <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold" style={{ color: ZONE_COLOR[it.stay.zone] }}>
+                                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: ZONE_COLOR[it.stay.zone] }} aria-hidden="true" />
+                                    {ZONE_LABEL[it.stay.zone]}
+                                  </span>
+                                )}
+                                <StayPlace lat={it.stay.lat} lng={it.stay.lng} cellSizeM={it.stay.cell_size_m} label={it.stay.area_label} />
                               </span>
                               <span className="tabular-nums text-muted">{sameDayTime(it.stay.from, it.stay.until)}</span>
                             </>

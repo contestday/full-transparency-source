@@ -11,6 +11,8 @@ import { BASE_ZONE_LABEL, WATCH_ZONE_LABEL, ZONE_COLOR, type BaseZone, type Watc
 import { fmtDate, fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
 import type { PublicHistoryRecord } from "@/lib/public-data";
 import { homeAreaFeatures, type HomeAreaShape } from "@/lib/home-area";
+import { PlaceVisits } from "./place-visits";
+import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 
 /** "1 h 20 min" between two times, or "" if unknown. */
 function duration(from: string, to: string | null): string {
@@ -39,7 +41,10 @@ export function HistoryView({
   stopZones = {},
   watchZones,
   homeArea = null,
+  searchArea = null,
 }: {
+  /** Public history place search: the searched place, outlined. */
+  searchArea?: AreaGeometry | null;
   /** My home area: shown on the map; movement inside it is never published. */
   homeArea?: HomeAreaShape | null;
   records: PublicHistoryRecord[];
@@ -59,6 +64,7 @@ export function HistoryView({
 
   const features = useMemo<MapFeature[]>(() => {
     const f: MapFeature[] = [...homeAreaFeatures(homeArea)];
+    if (searchArea) f.push({ type: "Feature", geometry: searchArea, properties: { color: "#142B49", opacity: 0.04, dashed: true, label: "The place searched" } });
     f.push(...route.map((r) => ({
       type: "Feature",
       geometry: { type: "LineString", coordinates: r.coords },
@@ -88,7 +94,7 @@ export function HistoryView({
       }
     });
     return f;
-  }, [route, visits, selected, stopZones, watchZones, homeArea]);
+  }, [route, visits, selected, stopZones, watchZones, homeArea, searchArea]);
 
   const days = useMemo(() => {
     const m = new Map<string, { visits: PublicHistoryRecord[]; samples: number }>();
@@ -182,7 +188,12 @@ export function HistoryView({
                       </span>
                     </button>
                   );
-                  return <li key={r.id}>{card}</li>;
+                  return (
+                    <li key={r.id}>
+                      {card}
+                      {on && <PlaceVisits record={r} />}
+                    </li>
+                  );
                 })}
               </ol>
             ) : (

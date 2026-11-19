@@ -583,7 +583,7 @@ In my home area: movement inside it is never shown.` });
           )}
         </div>
 
-        {visitsFor && <AreaVisits token={token} reference={visitsFor.reference} name={visitsFor.name} tier={visitsFor.tier} onClose={() => setVisitsFor(null)} />}
+        {visitsFor && <AreaVisits token={token} reference={visitsFor.reference} name={visitsFor.name} tier={visitsFor.tier} geojson={visitsFor.geojson ?? null} onClose={() => setVisitsFor(null)} />}
 
         <p className="text-xs text-muted">Keep this page&apos;s link private. Your areas are expressions of concern, not legal restrictions.</p>
       </Container>

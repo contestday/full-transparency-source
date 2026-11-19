@@ -71,6 +71,27 @@ export function GeofenceSubmitForm({
   const oldCentre = editing?.shape?.type === "circle" ? editing.shape.center : null;
   const needsOffset = shape?.type === "circle" && !(oldCentre && oldCentre.lat === shape.center.lat && oldCentre.lng === shape.center.lng);
 
+  // On its own page, show the areas already on this device's watch link for reference.
+  const [savedAreas, setSavedAreas] = useState<MapFeature[]>([]);
+  useEffect(() => {
+    if (context || !existing || !useExisting) return;
+    let live = true;
+    fetch(`/api/watch/${existing}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((v: { areas?: { tier: Tier; name: string; geojson: MapFeature["geometry"] | null }[] } | null) => {
+        if (!live || !v?.areas) return;
+        setSavedAreas(
+          v.areas.flatMap((a) =>
+            a.geojson ? [{ type: "Feature" as const, geometry: a.geojson, properties: { color: TIER_META[a.tier].color, opacity: 0.12, label: `Your ${TIER_META[a.tier].label} area${a.name ? `: ${a.name}` : ""}` } }] : [],
+          ),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [context, existing, useExisting]);
+
   useEffect(() => {
     // Offer to add to the watch link already saved on this device.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -240,7 +261,7 @@ export function GeofenceSubmitForm({
       </Card>
 
       <Card>
-        <GeofenceDrawer key={tier} value={shape} onChange={setShape} tier={tier} wideMode={mode} context={context} />
+        <GeofenceDrawer key={tier} value={shape} onChange={setShape} tier={tier} wideMode={mode} context={context ?? (useExisting ? savedAreas : undefined)} />
         {needsOffset && (
           <div className="mt-4 space-y-2 rounded-lg border border-border bg-sky/40 p-3">
             <Field label={`Move the centre by (metres, ${OFFSET_MIN_M} to ${OFFSET_MAX_M})`} htmlFor="centre-offset">

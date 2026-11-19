@@ -3,6 +3,7 @@ import { InstallBanner } from "@/components/pwa";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { JourneyTracker } from "@/components/journey-tracker";
 import { optionalEnv } from "@/lib/env";
+import { ShareButton } from "@/components/share-button";
 
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
@@ -15,6 +16,7 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
       <SiteFooter />
       <InstallBanner />
       <JourneyTracker />
+      <ShareButton />
     </>
   );
 }

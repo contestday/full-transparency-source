@@ -236,3 +236,37 @@ export async function reverseLabel(lat: number, lng: number, fetchImpl: typeof f
     return null;
   }
 }
+
+/**
+ * A fuller address for a stay: a public place's name, number, street, district,
+ * town and postcode. For anywhere that isn't a named public place (it could be
+ * someone's home) only the street, district and town: never a house number or
+ * full postcode. Pure: exported for tests.
+ */
+export function fullAddressFrom(r: NominatimReverse): string | null {
+  const a = r.address ?? {};
+  const road = a.road ?? a.pedestrian ?? a.footway ?? a.path ?? null;
+  const district = a.suburb ?? a.neighbourhood ?? a.village ?? a.hamlet ?? a.city_district ?? null;
+  const town = a.town ?? a.city ?? a.village ?? a.county ?? null;
+  if (r.name && r.category && NAMED_PLACE.test(r.category)) {
+    return joinUnique([r.name, [a.house_number, road].filter(Boolean).join(" ") || null, district, town, a.postcode ?? null]);
+  }
+  return joinUnique([road, district, town]);
+}
+
+/** Reverse-geocode to a fuller address (server-side; ≤1 request/second is the caller's job). */
+export async function reverseAddress(lat: number, lng: number, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  const url = new URL("https://nominatim.openstreetmap.org/reverse");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("lat", lat.toFixed(6));
+  url.searchParams.set("lon", lng.toFixed(6));
+  url.searchParams.set("zoom", "18");
+  url.searchParams.set("addressdetails", "1");
+  try {
+    const res = await fetchImpl(url, { headers: { "user-agent": UA, "accept-language": "en-GB" }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    return fullAddressFrom((await res.json()) as NominatimReverse);
+  } catch {
+    return null;
+  }
+}
