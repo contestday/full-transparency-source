@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* App theme mapped onto the Full Transparency brand tokens (design/tokens.css)
+   and the visual refresh (design artifact "Full Transparency – visual refresh"). */
+:root {
+  --background: #f5f9fd; /* ground */
+  --surface: var(--ft-color-surface);
+  --foreground: var(--ft-color-ink);
+  --muted: var(--ft-color-muted);
+  --border: var(--ft-color-border);
+  --hairline: #e3ecf4;
+  --accent: var(--ft-color-blue);
+  --accent-hover: var(--ft-color-blue-hover);
+  --accent-foreground: #ffffff;
+  --jade: var(--ft-color-jade);
+  --sky: var(--ft-color-sky);
+  --mint: var(--ft-color-mint);
+  --footer: #142b49;
+
+  --status-green: #007b60;
+  --status-amber: #f59e0b;
+  --status-amber-ring: #b45309;
+  --status-grey: #64748b;
+  --status-red: #c62828;
+  --status-purple: #7e22ce;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-ground: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-ink: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-jade: var(--jade);
+  --color-sky: var(--sky);
+  --color-mint: var(--mint);
+  --color-navy: var(--footer);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-dm-sans), var(--font-inter), system-ui, sans-serif;
+  --radius-control: var(--ft-radius-control);
+  --radius-card: var(--ft-radius-card);
+  --shadow-card: var(--ft-shadow-card);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ft-color-focus);
+  outline-offset: 2px;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.maplibregl-map {
+  font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping {
+    animation: none;
+  }
+}

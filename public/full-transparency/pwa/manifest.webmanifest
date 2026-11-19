@@ -1,0 +1,49 @@
+{
+  "id": "/",
+  "name": "Full Transparency",
+  "short_name": "Transparency",
+  "description": "Live status, movement history and upcoming plans.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ECF5FF",
+  "theme_color": "#245AD6",
+  "icons": [
+    {
+      "src": "/full-transparency/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/full-transparency/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/full-transparency/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "History",
+      "url": "/history"
+    },
+    {
+      "name": "Upcoming Plans",
+      "url": "/plans"
+    },
+    {
+      "name": "Watch an Area",
+      "url": "/geofences/submit"
+    },
+    {
+      "name": "My watch links",
+      "url": "/watch"
+    }
+  ]
+}

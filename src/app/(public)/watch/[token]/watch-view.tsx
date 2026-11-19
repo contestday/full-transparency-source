@@ -1,0 +1,580 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { LazyMap, type MapFeature } from "@/components/map-lazy";
+import { Button, Card, cn, Notice } from "@/components/ui";
+import { ConfirmButton } from "@/components/confirm-button";
+import { Container, EmptyState, Icon, MapFrame, OnTheMove, StatusDisk } from "@/components/design";
+import { InfoButton } from "@/components/info-button";
+import { InstallAppButton } from "@/components/pwa";
+import { SaveWatchLink } from "@/components/save-watch-link";
+import { NotifyPrompt } from "@/components/notify-prompt";
+import { AlertPopup } from "./alert-popup";
+import { SampleAlerts } from "./sample-alerts";
+import { GeofenceSubmitForm, type EditableArea } from "../../geofences/submit/submit-form";
+import type { DrawnShape } from "@/components/geofence-drawer";
+import { LIVE_STATUS_META, WATCH_LABELS } from "@/lib/live-status";
+import { fmtSqMiles, TIER_META, ZONE_COLOR, ZONE_LABEL, type Tier, type WideMode, type Zone } from "@/lib/geofence/tiers";
+import { gridCellRing } from "@/lib/geo";
+import { fmtDateTime, fmtTime, londonDayKey, relativeAge } from "@/lib/format";
+import { formatDistance } from "@/components/address-search";
+import { useNow } from "@/lib/use-now";
+import { forgetWatchLink, saveWatchLink } from "@/lib/watch-links";
+
+type Geo = { type: "Polygon"; coordinates: [number, number][][] } | { type: "MultiPolygon"; coordinates: [number, number][][][] };
+
+interface Area {
+  reference: string;
+  tier: Tier;
+  mode: WideMode | null;
+  kind: "shape" | "beyond_home" | "location";
+  name: string;
+  note: string;
+  /** Null for "beyond home" areas (never drawn: it would point to home). */
+  geojson: Geo | null;
+  shape: DrawnShape | null;
+  distance_m: number | null;
+  blurred_radius_m: number | null;
+  area_m2: number;
+  sealed: boolean;
+  submitted_at: string;
+  effective_from?: string;
+}
+
+interface View {
+  display_code: string | null;
+  moving: boolean;
+  enabled: boolean;
+  status: keyof typeof LIVE_STATUS_META;
+  label: string;
+  public_lat: number | null;
+  public_lng: number | null;
+  cell_size_m: number | null;
+  observed_at: string | null;
+  sealed_alerts: boolean;
+  is_sample?: boolean;
+  reminder_minutes?: number;
+  reminder_location_minutes?: number;
+  owner_name?: string;
+  owner_first?: string;
+  areas: Area[];
+}
+
+interface Journey {
+  day: string;
+  segments: { zone: Zone; coords: [number, number][] }[];
+  stops: { lat: number; lng: number; name: string; from: string; until: string | null; zone: Zone }[];
+}
+
+const letter = (i: number) => String.fromCharCode(65 + i);
+const ZONES: Zone[] = ["purple", "red", "amber", "yellow", "green"];
+
+/** One line describing an area: its rule and size. */
+function areaSummary(a: Area): string {
+  if (a.kind === "beyond_home") return `Anywhere more than about ${formatDistance(a.distance_m ?? 0)} from home`;
+  if (a.kind === "location") {
+    return `Within ${formatDistance(a.distance_m ?? 0)} · saved blurred as a ${formatDistance(a.blurred_radius_m ?? 0)} circle`;
+  }
+  const size = fmtSqMiles(a.area_m2);
+  if (a.tier === "wide") return `${a.mode === "outside" ? "Rather I didn't leave" : "Rather I didn't go in"} · ${size}`;
+  return size;
+}
+
+export function WatchView({ token, vapidPublicKey, sample = false }: { token: string; vapidPublicKey: string | null; /** The public, read-only sample view. */ sample?: boolean }) {
+  const router = useRouter();
+  const [view, setView] = useState<View | null>(null);
+  const now = useNow();
+  const [error, setError] = useState<string | null>(null);
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ key: number; features: MapFeature[] } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [day, setDay] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const [journey, setJourney] = useState<Journey | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/watch/${token}`, { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "This watch link could not be loaded");
+      setView(body);
+      setError(null);
+      // Remember real watch links on this device, never the public sample.
+      if (body.is_sample) forgetWatchLink(token);
+      else if (!sample) saveWatchLink(token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load");
+    }
+  }, [token, sample]);
+
+  const loadJourney = useCallback(
+    async (d: string | null) => {
+      try {
+        const res = await fetch(`/api/watch/${token}/journey${d ? `?day=${d}` : ""}`, { cache: "no-store" });
+        if (res.ok) setJourney(await res.json());
+      } catch {
+        /* keep the last one */
+      }
+    },
+    [token],
+  );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, [token, load]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadJourney(day);
+    if (day) return;
+    const t = setInterval(() => loadJourney(null), 120_000); // today: keep it fresh
+    return () => clearInterval(t);
+  }, [day, loadJourney]);
+
+  const status = view ? (view.enabled ? view.status : "disabled") : "unknown";
+  const meta = LIVE_STATUS_META[status] ?? LIVE_STATUS_META.unknown;
+
+  const areaFeature = useCallback(
+    (a: Area, i: number, on: boolean): MapFeature | null =>
+      a.geojson
+        ? {
+            type: "Feature",
+            geometry: a.geojson,
+            properties: {
+              color: TIER_META[a.tier].color,
+              // "Don't go outside" areas: outline only (the amber part is outside them).
+              opacity: a.mode === "outside" ? 0 : on ? 0.3 : a.tier === "wide" ? 0.08 : 0.16,
+              dashed: a.mode === "outside" || !on,
+              label: `${letter(i)} · ${a.name || TIER_META[a.tier].label}\n${areaSummary(a)}`,
+            },
+          }
+        : null,
+    [],
+  );
+
+  const features = useMemo<MapFeature[]>(() => {
+    if (!view) return [];
+    const f: MapFeature[] = view.areas.flatMap((a, i) => areaFeature(a, i, a.reference === selected) ?? []);
+    for (const s of journey?.segments ?? []) {
+      f.push({ type: "Feature", geometry: { type: "LineString", coordinates: s.coords }, properties: { color: ZONE_COLOR[s.zone] } });
+    }
+    for (const s of journey?.stops ?? []) {
+      f.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [s.lng, s.lat] },
+        properties: { color: ZONE_COLOR[s.zone], size: 6, label: `${s.name}\n${fmtTime(s.from)}${s.until ? `–${fmtTime(s.until)}` : ""}` },
+      });
+    }
+    if (view.public_lat != null && view.public_lng != null && (!day || day === londonDayKey(new Date().toISOString()))) {
+      const c = { lat: view.public_lat, lng: view.public_lng };
+      f.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [gridCellRing(c, view.cell_size_m ?? 1000)] }, properties: { color: meta.color, opacity: 0.25 } });
+      f.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 11, label: `${meta.label}\nApproximate area` } });
+    }
+    return f;
+  }, [view, meta, journey, selected, day, areaFeature]);
+
+  /** Tap an area: highlight it and zoom the map to it. */
+  function showArea(a: Area, i: number) {
+    setSelected(a.reference);
+    const feat = areaFeature(a, i, true);
+    if (feat) setFocus((f) => ({ key: (f?.key ?? 0) + 1, features: [feat] }));
+    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function setReminders(kind: "want" | "location", minutes: number) {
+    await fetch(`/api/watch/${token}/reminders`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, minutes }) });
+    await load();
+  }
+
+  async function setSealedAlerts(enabled: boolean) {
+    await fetch(`/api/watch/${token}/alerts`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ enabled }) });
+    await load();
+  }
+
+  async function removeArea(reference: string) {
+    await fetch(`/api/watch/${token}/areas/${reference}`, { method: "DELETE" });
+    if (selected === reference) setSelected(null);
+    await load();
+  }
+
+  if (error && !view) {
+    return (
+      <Container className="max-w-3xl space-y-4 py-10">
+        <h1 className="text-[32px] font-bold">My watch view</h1>
+        <Notice tone="red">{error}</Notice>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            forgetWatchLink(token);
+            router.push("/watch");
+          }}
+        >
+          Remove this link from this browser
+        </Button>
+      </Container>
+    );
+  }
+
+  const today = now ? londonDayKey(new Date(now).toISOString()) : undefined;
+  const yesterday = now ? londonDayKey(new Date(now - 86_400_000).toISOString()) : null;
+  const editingArea = view?.areas.find((a) => a.reference === editing) ?? null;
+  const context = (except: string | null) => (view?.areas ?? []).flatMap((a, i) => (a.reference === except ? [] : (areaFeature(a, i, false) ?? [])));
+  const hasSealed = view?.areas.some((a) => a.tier !== "wide");
+
+  /** Sample view: anything that would change or leave it shows the pop-up instead. */
+  function guard(e: ReactMouseEvent) {
+    if (!sample) return;
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-sample-ok]") || t.closest("[data-sample-dialog]")) return;
+    if (t.closest("button, a, input, select, textarea, label, form")) {
+      e.preventDefault();
+      e.stopPropagation();
+      setBlocked(true);
+    }
+  }
+
+  return (
+    <div onClickCapture={guard}>
+      {sample && (
+        <div className="border-b-4 border-[#B45309] bg-[#FFE7A3] text-[#142B49]">
+          <Container className="py-4">
+            <p className="text-lg font-bold sm:text-xl">This is a sample (dummy) watch account. Please don&apos;t make any changes.</p>
+            <p className="text-sm">
+              It shows exactly what a watcher sees: my real status, history and plans, coloured against this sample&apos;s areas.
+              Compare it with what everyone else sees on the public pages.
+            </p>
+          </Container>
+        </div>
+      )}
+      {sample && (
+        <Container className="pt-4">
+          <SampleAlerts token={token} vapidPublicKey={vapidPublicKey} />
+        </Container>
+      )}
+      {view && (
+        <AlertPopup
+          token={token}
+          sample={sample}
+          ownerName={view.owner_name ?? "the person this site tracks"}
+          ownerFirst={view.owner_first ?? "They"}
+          areaNames={Object.fromEntries(view.areas.map((a) => [a.reference, a.name]).filter(([, n]) => n))}
+          reminders={{ want: view.reminder_minutes ?? 30, location: view.reminder_location_minutes ?? 30 }}
+          onReminders={setReminders}
+          onClose={() => mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+        />
+      )}
+      {blocked && (
+        <div data-sample-dialog role="dialog" aria-modal="true" aria-labelledby="sample-title" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 text-center shadow-xl">
+            <h2 id="sample-title" className="text-xl font-bold">This is a dummy account</h2>
+            <p className="text-sm text-muted">Nothing on the sample can be added, changed or removed. Please return to the main app.</p>
+            <div className="flex flex-col gap-2">
+              <Link href="/" className="inline-flex h-12 items-center justify-center rounded-[var(--ft-radius-control)] bg-accent px-5 font-semibold text-white hover:bg-accent-hover">
+                Return to the main app
+              </Link>
+              <button type="button" className="h-11 rounded-[var(--ft-radius-control)] border border-border font-semibold" onClick={() => setBlocked(false)}>
+                Keep looking at the sample
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="bg-navy text-[#DCE7F3]">
+        <Container className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 text-sm">
+          <Icon name="lock" className="shrink-0 text-white" />
+          <span className="min-w-0 flex-1 basis-48">Only people with this link can see this page.</span>
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                await navigator.clipboard?.writeText(window.location.href);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              {copied ? "Copied" : "Copy link"}
+            </Button>
+            <Link href="/watch?manage=1" className="font-semibold text-white underline-offset-2 hover:underline">
+              Use another link
+            </Link>
+          </div>
+        </Container>
+      </div>
+
+      {!sample && <NotifyPrompt compact target="watch" token={token} vapidPublicKey={vapidPublicKey} />}
+
+      <Container className="space-y-6 pb-20 pt-6 sm:pt-8">
+        <div>
+          <h1 className="text-[28px] font-bold sm:text-[44px]">My watch view</h1>
+          {view?.is_sample && !sample && (
+            <Notice tone="amber" title="This is the public sample watch link">
+              You&apos;re setting it up. It isn&apos;t saved as your own watch link on this device. Lock it in Admin → Settings when
+              it&apos;s ready.
+            </Notice>
+          )}
+          {view?.display_code && (
+            <p className="mt-1 text-sm text-muted">
+              You&apos;re <strong className="text-ink">Watcher #{view.display_code}</strong>: a random number so you can recognise
+              your view. It isn&apos;t linked to you.
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-6">
+          <section aria-live="polite" className="min-w-0 grow-[7] basis-[520px] space-y-4 rounded-[var(--ft-radius-card)] border border-border bg-surface p-4 shadow-[var(--ft-shadow-card)] sm:p-7">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold uppercase tracking-[.08em] text-muted">Status for my areas</span>
+              <span className="text-muted">Refreshes every minute</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <StatusDisk status={status} size={52} />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[22px] font-bold leading-tight sm:text-[32px]">
+                  {view ? (WATCH_LABELS[status as keyof typeof WATCH_LABELS] ?? meta.label) : "Loading…"}
+                </h2>
+                <p className="text-sm text-muted tabular-nums">
+                  {view?.observed_at && !view.moving && status !== "unknown" && now && now - Date.parse(view.observed_at) > 10 * 60_000
+                    ? `Not moved since ${fmtDateTime(view.observed_at)} (${relativeAge(view.observed_at)})`
+                    : view?.observed_at
+                      ? `Last GPS update ${relativeAge(view.observed_at)} · ${fmtDateTime(view.observed_at)}`
+                      : view && !view.enabled
+                        ? "The live marker is switched off at the moment."
+                        : ""}
+                </p>
+              </div>
+              {view?.moving && status !== "unknown" && status !== "disabled" && <OnTheMove status={status} />}
+            </div>
+
+            <div data-sample-ok className="flex flex-wrap items-center gap-2" role="group" aria-label="Which day's journey">
+              <span className="text-sm font-semibold">Journey:</span>
+              {[
+                [null, "Today"],
+                [yesterday, "Yesterday"],
+              ].map(([d, label]) => (
+                <Button key={label} type="button" size="sm" variant={day === d ? "primary" : "secondary"} aria-pressed={day === d} onClick={() => setDay(d)}>
+                  {label}
+                </Button>
+              ))}
+              <input
+                type="date"
+                aria-label="Choose a day"
+                max={today}
+                value={day ?? today ?? ""}
+                onChange={(e) => setDay(e.target.value && e.target.value !== today ? e.target.value : null)}
+                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm"
+              />
+            </div>
+
+            <div ref={mapRef} data-sample-ok>
+              <MapFrame className="border-0 p-0 shadow-none">
+                <LazyMap features={features} fit="once" focus={focus} className="h-[320px] w-full sm:h-[480px]" ariaLabel="Map of my areas, the day's journey and the approximate live position" />
+              </MapFrame>
+            </div>
+            {journey && !journey.segments.length && !journey.stops.length && (
+              <p className="text-sm text-muted">No published journey for this day yet (the history is published every few minutes).</p>
+            )}
+            <InfoButton label="What the colours mean">
+              <ul className="space-y-1.5">
+                {ZONES.map((z) => (
+                  <li key={z} className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: ZONE_COLOR[z] }} aria-hidden="true" />
+                    {ZONE_LABEL[z]}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted">The status, the route and the stops all use these colours. Only you see purple, red and amber.</p>
+            </InfoButton>
+          </section>
+
+          <div className="min-w-0 grow-[5] basis-[340px] space-y-6">
+            <Card className="space-y-3 p-4 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-bold">My areas</h2>
+                <span className="text-sm text-muted tabular-nums">{view?.areas.length ?? 0} area{(view?.areas.length ?? 0) === 1 ? "" : "s"}</span>
+              </div>
+              {view && !view.areas.length && <EmptyState icon="pin" title="No areas yet.">Add one below to start watching.</EmptyState>}
+              <ul data-private className="space-y-2">
+                {view?.areas.map((a, i) => {
+                  const on = a.reference === selected;
+                  return (
+                    <li key={a.reference} className={cn("rounded-xl border p-3", on ? "border-2 border-ink" : "border-hairline")}>
+                      <button type="button" data-sample-ok className="flex w-full items-start gap-3 text-left" onClick={() => showArea(a, i)} aria-pressed={on}>
+                        <span
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-bold text-white"
+                          style={{ background: TIER_META[a.tier].color }}
+                        >
+                          {letter(i)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold [overflow-wrap:anywhere]">{a.name || TIER_META[a.tier].label}</span>
+                          <span className="block text-xs text-muted">
+                            {TIER_META[a.tier].label} · {areaSummary(a)}
+                          </span>
+                          {a.kind === "beyond_home" && <span className="block text-xs text-muted">Not drawn on the map: it would point to my home.</span>}
+                          {a.effective_from && <span className="block text-xs text-muted">In effect from {fmtDateTime(a.effective_from)}</span>}
+                          {a.tier === "location" && <span className="block text-xs text-muted">Locked to your link: only you can see it.</span>}
+                        </span>
+                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setAdding(false);
+                            setEditing(a.reference);
+                            setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <ConfirmButton prompt="Remove?" confirmLabel="Remove" onConfirm={() => removeArea(a.reference)}>
+                          Remove
+                        </ConfirmButton>
+                        <span className="ml-auto text-xs text-muted">{a.reference}</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => {
+                  setEditing(null);
+                  setAdding((x) => !x);
+                  setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                }}
+              >
+                {adding ? "Close" : "Add an area"}
+              </Button>
+            </Card>
+
+            <Card className="space-y-3 p-4 sm:p-6">
+              <h2 className="flex items-center gap-2 text-xl font-bold">
+                <Icon name="bell" className="text-accent" /> Notifications
+              </h2>
+              <p className="text-sm text-muted">
+                Each device you turn notifications on for (the yellow bar at the top) gets an alert when I enter or leave your Wish and Want
+                areas.
+              </p>
+              {view && (
+                <div className="space-y-2 border-t border-hairline pt-3 text-sm">
+                  <p className="font-semibold">While I&apos;m still there, remind me</p>
+                  {(
+                    [
+                      ["want", "In a Want area (red)", view.reminder_minutes ?? 30],
+                      ["location", "At a Location (purple)", view.reminder_location_minutes ?? 30],
+                    ] as const
+                  ).map(([kind, label, value]) => (
+                    <label key={kind} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>{label}</span>
+                      <select
+                        className="h-10 rounded-lg border border-border bg-surface px-2"
+                        value={value}
+                        onChange={(e) => setReminders(kind, Number(e.target.value))}
+                      >
+                        <option value={10}>every 10 minutes</option>
+                        <option value={20}>every 20 minutes</option>
+                        <option value={30}>every 30 minutes</option>
+                        <option value={60}>every hour</option>
+                        <option value={0}>not at all</option>
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {view && (
+                <div className="space-y-2 border-t border-hairline pt-3">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="checkbox" className="mt-0.5 h-5 w-5 shrink-0" checked={view.sealed_alerts} onChange={(e) => setSealedAlerts(e.target.checked)} />
+                    <span className="font-semibold">
+                      Also alert me for my Locations{!hasSealed && <span className="font-normal text-muted"> (you have none yet)</span>}
+                    </span>
+                  </label>
+                  <InfoButton>
+                    <p>
+                      Locations are locked to your link, so normally the site can only check them while this page is open. Ticking this lets
+                      the site keep your key (encrypted) and check them as I move, so it can send alerts. Untick to lock them again.
+                    </p>
+                  </InfoButton>
+                </div>
+              )}
+            </Card>
+
+            <Card className="space-y-3 p-4 sm:p-6">
+              <h2 className="text-xl font-bold">Keep your link</h2>
+              <SaveWatchLink href={`/watch/${token}`} />
+            </Card>
+
+            <Card className="space-y-3 p-4 sm:p-6">
+              <h2 className="text-xl font-bold">Keep this on your phone</h2>
+              <p className="text-sm text-muted">
+                Install this page as an app: it opens straight into this view, so you won&apos;t need the link again on this device.
+              </p>
+              <InstallAppButton label="Install my watch view" />
+            </Card>
+          </div>
+        </div>
+
+        <div ref={formRef} className="scroll-mt-4">
+          {savedNote && (
+            <Notice tone="amber" title="Want area made bigger">
+              {savedNote}{" "}
+              <button type="button" className="font-semibold underline" onClick={() => setSavedNote(null)}>
+                OK
+              </button>
+            </Notice>
+          )}
+          {editingArea && (
+            <Card className="p-4 sm:p-6">
+              <h2 className="mb-4 text-xl font-bold">Edit {editingArea.name || editingArea.reference}</h2>
+              <GeofenceSubmitForm
+                key={editingArea.reference}
+                watchToken={token}
+                editing={editingArea as EditableArea}
+                context={context(editingArea.reference)}
+                onCancel={() => setEditing(null)}
+                onAdded={(message) => {
+                  setSavedNote(message ?? null);
+                  setEditing(null);
+                  void load();
+                  void loadJourney(day);
+                }}
+              />
+            </Card>
+          )}
+          {adding && !editingArea && (
+            <Card className="p-4 sm:p-6">
+              <h2 className="mb-4 text-xl font-bold">Add an area</h2>
+              <GeofenceSubmitForm
+                watchToken={token}
+                context={context(null)}
+                onCancel={() => setAdding(false)}
+                onAdded={(message) => {
+                  setSavedNote(message ?? null);
+                  setAdding(false);
+                  void load();
+                  void loadJourney(day);
+                }}
+              />
+            </Card>
+          )}
+        </div>
+
+        <p className="text-xs text-muted">Keep this page&apos;s link private. Your areas are expressions of concern, not legal restrictions.</p>
+      </Container>
+    </div>
+  );
+}
