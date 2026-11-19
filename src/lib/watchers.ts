@@ -9,6 +9,7 @@ import { zoneAt, type Tier, type WideMode } from "@/lib/geofence/tiers";
 import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 import { liveHoldMs, optionalEnv } from "@/lib/env";
 import { alertText, type AlertEvent } from "@/lib/alert-text";
+import { loadHomeArea, type HomeArea } from "@/lib/home";
 
 
 export interface Watcher {
@@ -90,6 +91,8 @@ export interface WatcherArea {
 }
 
 export interface WatcherView {
+  /** Where nothing is published (shown on the map; movement inside it never is). */
+  home_area?: HomeArea | null;
   /** Friendly random label, e.g. "4827". */
   display_code: string | null;
   moving: boolean;
@@ -146,13 +149,14 @@ async function latestReading(): Promise<{ lat: number; lng: number; observed_at:
 /** Everything one watcher may see: their own areas and the colour relative to them. Needs their link. */
 export async function watcherView(watcherId: string, token: string): Promise<WatcherView> {
   const supabase = createServiceClient();
-  const [enabled, areas, { data: live }, { data: me }, sample, owner] = await Promise.all([
+  const [enabled, areas, { data: live }, { data: me }, sample, owner, homeArea] = await Promise.all([
     liveMarkerEnabled(),
     loadWatchAreas(watcherId, token),
     supabase.from("live_status").select("*").eq("id", 1).maybeSingle(),
     supabase.from("watchers").select("*").eq("id", watcherId).maybeSingle(),
     import("@/lib/sample-watcher").then((m) => m.loadSampleWatcher()).catch(() => null),
     loadOwnerProfile(),
+    loadHomeArea().catch(() => null),
   ]);
   const isSample = sample?.watcherId === watcherId;
   const displayCode = (me?.display_code as string | null | undefined) ?? null;
@@ -164,7 +168,7 @@ export async function watcherView(watcherId: string, token: string): Promise<Wat
 
   const publicAreas = areas.map(toWatcherArea);
   if (!enabled) {
-    return { display_code: displayCode, moving: false, enabled, status: "disabled", label: LIVE_STATUS_META.disabled.label, public_lat: null, public_lng: null, cell_size_m: null, observed_at: null, sealed_alerts: sealedAlerts, is_sample: isSample, reminder_minutes: Number(me?.reminder_minutes ?? 30), reminder_location_minutes: Number(me?.reminder_location_minutes ?? 30), owner_name: owner.name, owner_first: owner.first, areas: publicAreas };
+    return { display_code: displayCode, moving: false, enabled, status: "disabled", label: LIVE_STATUS_META.disabled.label, public_lat: null, public_lng: null, cell_size_m: null, observed_at: null, sealed_alerts: sealedAlerts, is_sample: isSample, reminder_minutes: Number(me?.reminder_minutes ?? 30), reminder_location_minutes: Number(me?.reminder_location_minutes ?? 30), owner_name: owner.name, owner_first: owner.first, areas: publicAreas, home_area: homeArea };
   }
   const stale = !live?.observed_at || Date.now() - Date.parse(live.observed_at) > liveHoldMs();
   let areaZone: "purple" | "red" | "amber" | null = null;
@@ -194,6 +198,7 @@ export async function watcherView(watcherId: string, token: string): Promise<Wat
     owner_name: owner.name,
     owner_first: owner.first,
     areas: publicAreas,
+    home_area: homeArea,
   };
 }
 

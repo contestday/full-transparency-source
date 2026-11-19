@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
-import { Badge, Button, Card, Input, Notice, Select } from "@/components/ui";
+import { Badge, Button, Card, cn, Input, Notice, Select } from "@/components/ui";
 import { api } from "@/lib/client-api";
 import { circleRing } from "@/lib/geo";
 import { fmtDateTime, fmtTime, relativeAge } from "@/lib/format";
@@ -11,6 +11,7 @@ import { LIVE_STATUS_META, type LiveStatus } from "@/lib/live-status";
 import type { MapFence } from "./map-context";
 import { signedDistanceM, type AreaGeometry } from "@/lib/geofence/area-geometry";
 import { formatDistance } from "@/components/address-search";
+import { homeAreaFeatures, type HomeAreaShape } from "@/lib/home-area";
 
 interface Obs {
   id: string;
@@ -71,8 +72,10 @@ export function LocationExplorer({
   staleMinutes,
   batches = [],
   liveStatus = "unknown",
+  homeArea = null,
 }: {
   liveStatus?: LiveStatus;
+  homeArea?: HomeAreaShape | null;
   mode: "live" | "history";
   geofences?: Fence[];
   plans?: PlanPoint[];
@@ -127,7 +130,8 @@ export function LocationExplorer({
   }, [mode, load]);
 
   const features = useMemo<MapFeature[]>(() => {
-    const f: MapFeature[] = [];
+    // My home area (what visitors and watchers see too: movement inside it is never published).
+    const f: MapFeature[] = homeAreaFeatures(homeArea);
     for (const g of geofences) {
       if (!groups[g.group]) continue;
       f.push({
@@ -135,8 +139,9 @@ export function LocationExplorer({
         geometry: g.geojson,
         properties: {
           color: GROUPS[g.group].color,
+          // Watchers' areas have solid outlines; my own noted areas are dashed.
           // "Rather I didn't leave" Wish areas: outline only (the amber part is outside them).
-          dashed: g.outside,
+          dashed: g.group === "mine",
           opacity: g.outside ? 0 : 0.14,
           label: `${GROUPS[g.group].label}${g.sample ? " · sample" : ""}${g.outside ? " · rather I didn't leave" : ""}\n${g.reference}${g.name ? `\n${g.name.slice(0, 120)}` : ""}`,
         },
@@ -186,7 +191,21 @@ Latest: ${fmtDateTime(latest.observed_at)}\n${latest.source}${latest.accuracy_m 
       });
     }
     return f;
-  }, [data, geofences, plans, layers, groups, liveStatus]);
+  }, [data, geofences, plans, layers, groups, liveStatus, homeArea]);
+
+  // The middle of each area shown, for the number markers when zoomed out.
+  const countPoints = useMemo(
+    () =>
+      geofences
+        .filter((g) => groups[g.group])
+        .map((g) => {
+          const ring = g.geojson.type === "Polygon" ? g.geojson.coordinates[0] : g.geojson.coordinates[0][0];
+          const lngs = ring.map((c) => c[0]);
+          const lats = ring.map((c) => c[1]);
+          return { lng: (Math.min(...lngs) + Math.max(...lngs)) / 2, lat: (Math.min(...lats) + Math.max(...lats)) / 2 };
+        }),
+    [geofences, groups],
+  );
 
   const latest = data?.latest ?? null;
   const stale = isStale(latest?.observed_at ?? null, staleMinutes);
@@ -254,7 +273,11 @@ Latest: ${fmtDateTime(latest.observed_at)}\n${latest.source}${latest.accuracy_m 
           {(Object.keys(GROUPS) as MapFence["group"][]).map((k) => (
             <label key={k} className="flex items-center gap-1.5">
               <input type="checkbox" checked={groups[k]} onChange={(e) => setGroups((g) => ({ ...g, [k]: e.target.checked }))} />
-              <span className="inline-block h-3 w-3 rounded-sm" style={{ background: GROUPS[k].color }} aria-hidden="true" />
+              <span
+                className={cn("inline-block h-3 w-3 rounded-sm border-2", k === "mine" && "border-dashed bg-transparent")}
+                style={k === "mine" ? { borderColor: GROUPS[k].color } : { background: GROUPS[k].color, borderColor: GROUPS[k].color }}
+                aria-hidden="true"
+              />
               {GROUPS[k].label} ({geofences.filter((g) => g.group === k).length})
             </label>
           ))}
@@ -326,7 +349,7 @@ Latest: ${fmtDateTime(latest.observed_at)}\n${latest.source}${latest.accuracy_m 
       {data?.truncated && <Notice tone="amber">Showing the first {data.observations.length} observations. Narrow the range to see all.</Notice>}
 
       <div className={mode === "history" ? "grid gap-4 lg:grid-cols-[1fr_340px]" : ""}>
-        <LazyMap features={features} className="h-[65vh] min-h-80 w-full" ariaLabel="Private location map" />
+        <LazyMap features={features} countPoints={countPoints} className="h-[65vh] min-h-80 w-full" ariaLabel="Private location map" />
         {mode === "history" && (
           <div className="max-h-[65vh] space-y-1 overflow-y-auto text-sm" aria-label="Movement timeline">
             <p className="font-semibold">

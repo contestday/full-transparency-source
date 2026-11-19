@@ -13,6 +13,7 @@ import { SaveWatchLink } from "@/components/save-watch-link";
 import { NotifyPrompt } from "@/components/notify-prompt";
 import { AlertPopup } from "./alert-popup";
 import { SampleAlerts } from "./sample-alerts";
+import { AreaVisits } from "./area-visits";
 import { GeofenceSubmitForm, type EditableArea } from "../../geofences/submit/submit-form";
 import type { DrawnShape } from "@/components/geofence-drawer";
 import { LIVE_STATUS_META, WATCH_LABELS } from "@/lib/live-status";
@@ -21,7 +22,9 @@ import { gridCellRing } from "@/lib/geo";
 import { fmtDateTime, fmtTime, londonDayKey, relativeAge } from "@/lib/format";
 import { formatDistance } from "@/components/address-search";
 import { useNow } from "@/lib/use-now";
+import { quickRanges } from "@/lib/history-range";
 import { forgetWatchLink, saveWatchLink } from "@/lib/watch-links";
+import { atHome, homeAreaFeatures, type HomeAreaShape } from "@/lib/home-area";
 
 type Geo = { type: "Polygon"; coordinates: [number, number][][] } | { type: "MultiPolygon"; coordinates: [number, number][][][] };
 
@@ -60,10 +63,13 @@ interface View {
   owner_name?: string;
   owner_first?: string;
   areas: Area[];
+  home_area?: HomeAreaShape | null;
 }
 
 interface Journey {
   day: string;
+  /** False for long periods: stays only, no routes. */
+  routes?: boolean;
   segments: { zone: Zone; coords: [number, number][] }[];
   stops: { lat: number; lng: number; name: string; from: string; until: string | null; zone: Zone }[];
 }
@@ -93,7 +99,11 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ key: number; features: MapFeature[] } | null>(null);
   const [copied, setCopied] = useState(false);
-  const [day, setDay] = useState<string | null>(null);
+  // Which period's journey: Today, Yesterday, This week, This month, This year or All time.
+  const [rangeKey, setRangeKey] = useState("today");
+  const [journeyTick, setJourneyTick] = useState(0);
+  // The area whose entries and exits are open in the overlay.
+  const [visitsFor, setVisitsFor] = useState<Area | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [journey, setJourney] = useState<Journey | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -115,9 +125,9 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   }, [token, sample]);
 
   const loadJourney = useCallback(
-    async (d: string | null) => {
+    async (r: { from: string; to: string } | null) => {
       try {
-        const res = await fetch(`/api/watch/${token}/journey${d ? `?day=${d}` : ""}`, { cache: "no-store" });
+        const res = await fetch(`/api/watch/${token}/journey${r ? `?from=${r.from}&to=${r.to}` : ""}`, { cache: "no-store" });
         if (res.ok) setJourney(await res.json());
       } catch {
         /* keep the last one */
@@ -134,12 +144,13 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   }, [token, load]);
 
   useEffect(() => {
+    const r = rangeKey === "today" ? null : (quickRanges(londonDayKey(new Date().toISOString())).find((x) => x.key === rangeKey) ?? null);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadJourney(day);
-    if (day) return;
+    void loadJourney(r);
+    if (r) return;
     const t = setInterval(() => loadJourney(null), 120_000); // today: keep it fresh
     return () => clearInterval(t);
-  }, [day, loadJourney]);
+  }, [rangeKey, journeyTick, loadJourney]);
 
   const status = view ? (view.enabled ? view.status : "disabled") : "unknown";
   const meta = LIVE_STATUS_META[status] ?? LIVE_STATUS_META.unknown;
@@ -154,7 +165,8 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
               color: TIER_META[a.tier].color,
               // "Don't go outside" areas: outline only (the amber part is outside them).
               opacity: a.mode === "outside" ? 0 : on ? 0.3 : a.tier === "wide" ? 0.08 : 0.16,
-              dashed: a.mode === "outside" || !on,
+              // Your own areas always have solid outlines (dashed outlines are only ever my noted areas).
+              dashed: false,
               label: `${letter(i)} · ${a.name || TIER_META[a.tier].label}\n${areaSummary(a)}`,
             },
           }
@@ -164,7 +176,13 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
 
   const features = useMemo<MapFeature[]>(() => {
     if (!view) return [];
-    const f: MapFeature[] = view.areas.flatMap((a, i) => areaFeature(a, i, a.reference === selected) ?? []);
+    // The live position (or the home marker) belongs with periods that include now.
+    const today = rangeKey !== "yesterday";
+    // My home area (where movement is never shown), with a large marker when I'm in it now.
+    const here = today && atHome(view.status, view.public_lat);
+    const f: MapFeature[] = homeAreaFeatures(view.home_area, { here, color: meta.color, hereLabel: `${meta.label}
+In my home area: movement inside it is never shown.` });
+    f.push(...view.areas.flatMap((a, i) => areaFeature(a, i, a.reference === selected) ?? []));
     for (const s of journey?.segments ?? []) {
       f.push({ type: "Feature", geometry: { type: "LineString", coordinates: s.coords }, properties: { color: ZONE_COLOR[s.zone] } });
     }
@@ -175,13 +193,13 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
         properties: { color: ZONE_COLOR[s.zone], size: 6, label: `${s.name}\n${fmtTime(s.from)}${s.until ? `–${fmtTime(s.until)}` : ""}` },
       });
     }
-    if (view.public_lat != null && view.public_lng != null && (!day || day === londonDayKey(new Date().toISOString()))) {
+    if (view.public_lat != null && view.public_lng != null && today) {
       const c = { lat: view.public_lat, lng: view.public_lng };
       f.push({ type: "Feature", geometry: { type: "Polygon", coordinates: [gridCellRing(c, view.cell_size_m ?? 1000)] }, properties: { color: meta.color, opacity: 0.25 } });
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 11, label: `${meta.label}\nApproximate area` } });
     }
     return f;
-  }, [view, meta, journey, selected, day, areaFeature]);
+  }, [view, meta, journey, selected, rangeKey, areaFeature]);
 
   /** Tap an area: highlight it and zoom the map to it. */
   function showArea(a: Area, i: number) {
@@ -226,7 +244,6 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   }
 
   const today = now ? londonDayKey(new Date(now).toISOString()) : undefined;
-  const yesterday = now ? londonDayKey(new Date(now - 86_400_000).toISOString()) : null;
   const editingArea = view?.areas.find((a) => a.reference === editing) ?? null;
   const context = (except: string | null) => (view?.areas ?? []).flatMap((a, i) => (a.reference === except ? [] : (areaFeature(a, i, false) ?? [])));
   const hasSealed = view?.areas.some((a) => a.tier !== "wide");
@@ -356,25 +373,15 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
               {view?.moving && status !== "unknown" && status !== "disabled" && <OnTheMove status={status} />}
             </div>
 
-            <div data-sample-ok className="flex flex-wrap items-center gap-2" role="group" aria-label="Which day's journey">
+            <div data-sample-ok className="flex flex-wrap items-center gap-2" role="group" aria-label="Which period's journey">
               <span className="text-sm font-semibold">Journey:</span>
-              {[
-                [null, "Today"],
-                [yesterday, "Yesterday"],
-              ].map(([d, label]) => (
-                <Button key={label} type="button" size="sm" variant={day === d ? "primary" : "secondary"} aria-pressed={day === d} onClick={() => setDay(d)}>
-                  {label}
+              {(today ? quickRanges(today) : []).map((r) => (
+                <Button key={r.key} type="button" size="sm" variant={rangeKey === r.key ? "primary" : "secondary"} aria-pressed={rangeKey === r.key} onClick={() => setRangeKey(r.key)}>
+                  {r.label}
                 </Button>
               ))}
-              <input
-                type="date"
-                aria-label="Choose a day"
-                max={today}
-                value={day ?? today ?? ""}
-                onChange={(e) => setDay(e.target.value && e.target.value !== today ? e.target.value : null)}
-                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm"
-              />
             </div>
+            {journey && journey.routes === false && <p className="text-sm text-muted">Showing the places I stayed. Routes are drawn for up to 21 days.</p>}
 
             <div ref={mapRef} data-sample-ok>
               <MapFrame className="border-0 p-0 shadow-none">
@@ -382,7 +389,7 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
               </MapFrame>
             </div>
             {journey && !journey.segments.length && !journey.stops.length && (
-              <p className="text-sm text-muted">No published journey for this day yet (the history is published every few minutes).</p>
+              <p className="text-sm text-muted">No published journey for this period yet (the history is published every few minutes).</p>
             )}
             <InfoButton label="What the colours mean">
               <ul className="space-y-1.5">
@@ -427,6 +434,9 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
                         </span>
                       </button>
                       <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
+                        <Button type="button" size="sm" data-sample-ok onClick={() => setVisitsFor(a)}>
+                          Times in this area
+                        </Button>
                         <Button
                           type="button"
                           size="sm"
@@ -550,7 +560,7 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
                   setSavedNote(message ?? null);
                   setEditing(null);
                   void load();
-                  void loadJourney(day);
+                  setJourneyTick((t) => t + 1);
                 }}
               />
             </Card>
@@ -566,12 +576,14 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
                   setSavedNote(message ?? null);
                   setAdding(false);
                   void load();
-                  void loadJourney(day);
+                  setJourneyTick((t) => t + 1);
                 }}
               />
             </Card>
           )}
         </div>
+
+        {visitsFor && <AreaVisits token={token} reference={visitsFor.reference} name={visitsFor.name} tier={visitsFor.tier} onClose={() => setVisitsFor(null)} />}
 
         <p className="text-xs text-muted">Keep this page&apos;s link private. Your areas are expressions of concern, not legal restrictions.</p>
       </Container>

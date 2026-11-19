@@ -60,7 +60,8 @@ export interface PublicPlanLocation {
 /** Upper bound on rows per history request (~3 weeks of 3-minute samples). */
 export const HISTORY_MAX_ROWS = 12_000;
 
-export async function getPublicHistory(from: string, to: string): Promise<{
+/** `stopsOnly`: just the stays (for long ranges, where the routes would be too many points). */
+export async function getPublicHistory(from: string, to: string, opts: { stopsOnly?: boolean } = {}): Promise<{
   records: PublicHistoryRecord[];
   lastPublishedAt: string | null;
   paused: boolean;
@@ -72,11 +73,9 @@ export async function getPublicHistory(from: string, to: string): Promise<{
   const fetchAll = async () => {
     const rows: PublicHistoryRecord[] = [];
     for (let fromRow = 0; fromRow < HISTORY_MAX_ROWS; fromRow += 1000) {
-      const { data, error } = await supabase
-        .from("public_history")
-        .select("*")
-        .gte("observed_at", from)
-        .lte("observed_at", to)
+      let q = supabase.from("public_history").select("*").gte("observed_at", from).lte("observed_at", to);
+      if (opts.stopsOnly) q = q.eq("kind", "visit");
+      const { data, error } = await q
         .order("observed_at", { ascending: true })
         .order("id", { ascending: true })
         .range(fromRow, fromRow + 999);
@@ -134,6 +133,8 @@ export interface PublicLiveStatus {
   updated_at: string | null;
   /** True when recent GPS shows movement (absent before migration 0008). */
   moving?: boolean;
+  /** Where nothing is published (added by the page or API, not stored here). */
+  home_area?: { lat: number; lng: number; radius_m: number } | null;
 }
 
 export async function getPublicLiveStatus(): Promise<PublicLiveStatus> {

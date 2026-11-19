@@ -79,7 +79,8 @@ export function GeofenceManager({
         geometry: f.geojson,
         properties: {
           color: f.id === selected ? "#1d4ed8" : KIND[kindOf(f)].color,
-          dashed: f.verification_status !== "verified",
+          // My own noted areas are dashed; watchers' areas are solid.
+          dashed: kindOf(f) === "mine",
           opacity: f.id === selected ? 0.35 : 0.15,
           label: `${KIND[kindOf(f)].label} · ${f.reference}\n${f.description?.slice(0, 200) ?? ""}`,
         },

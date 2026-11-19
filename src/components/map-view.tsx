@@ -33,6 +33,12 @@ interface Props {
   fitDraft?: boolean;
   /** Zoom to these features whenever `key` changes (e.g. tapping an area in a list). */
   focus?: { key: number; features: MapFeature[] } | null;
+  /**
+   * Points (e.g. the middle of each area) counted in white number markers when
+   * zoomed out, so a busy map still shows how many areas are where. Hidden once
+   * zoomed in far enough to see the areas themselves.
+   */
+  countPoints?: { lat: number; lng: number }[];
   initialCenter?: [number, number];
   initialZoom?: number;
   ariaLabel?: string;
@@ -88,6 +94,29 @@ function addLayers(map: MLMap, id: string) {
   });
 }
 
+/** Zoom level from which the areas themselves are clear and the counts are hidden. */
+const COUNTS_MAX_ZOOM = 11;
+
+function addCountLayers(map: MLMap) {
+  map.addSource("counts", { type: "geojson", data: EMPTY, cluster: true, clusterRadius: 50, clusterMaxZoom: 22 });
+  const count = ["coalesce", ["get", "point_count"], 1] as unknown as number;
+  map.addLayer({
+    id: "counts-circle",
+    type: "circle",
+    source: "counts",
+    maxzoom: COUNTS_MAX_ZOOM,
+    paint: { "circle-color": "#ffffff", "circle-radius": ["step", count, 13, 10, 16, 50, 19] as unknown as number, "circle-stroke-color": "#142B49", "circle-stroke-width": 2 },
+  });
+  map.addLayer({
+    id: "counts-label",
+    type: "symbol",
+    source: "counts",
+    maxzoom: COUNTS_MAX_ZOOM,
+    layout: { "text-field": ["to-string", count] as unknown as string, "text-font": ["Noto Sans Bold"], "text-size": 13, "text-allow-overlap": true },
+    paint: { "text-color": "#142B49" },
+  });
+}
+
 function boundsOf(features: MapFeature[]): maplibregl.LngLatBounds | null {
   const b = new maplibregl.LngLatBounds();
   let any = false;
@@ -111,6 +140,7 @@ export function MapView({
   fit = true,
   fitDraft = false,
   focus = null,
+  countPoints,
   initialCenter = [-2.5, 54.0],
   initialZoom = 5,
   ariaLabel = "Map",
@@ -146,10 +176,16 @@ export function MapView({
     map.on("load", () => {
       addLayers(map, "data");
       addLayers(map, "draft");
+      addCountLayers(map);
       setLoaded(true);
     });
     map.on("error", (e) => console.warn("map error", e.error?.message));
     map.on("click", (e: MapMouseEvent) => {
+      const count = map.getLayer("counts-circle") ? map.queryRenderedFeatures(e.point, { layers: ["counts-circle"] })[0] : undefined;
+      if (count && count.geometry.type === "Point") {
+        map.easeTo({ center: count.geometry.coordinates as [number, number], zoom: Math.min(COUNTS_MAX_ZOOM, map.getZoom() + 2) });
+        return;
+      }
       const hits = map.queryRenderedFeatures(e.point, {
         layers: ["data-point", "data-fill", "data-line"].filter((l) => map.getLayer(l)),
       });
@@ -196,6 +232,15 @@ export function MapView({
       if (b) map.fitBounds(b, { padding: 40, maxZoom: 16, duration: 400 });
     }
   }, [draft, loaded, fitDraft]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) return;
+    (map.getSource("counts") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: (countPoints ?? []).map((p) => ({ type: "Feature", geometry: { type: "Point", coordinates: [p.lng, p.lat] }, properties: {} })),
+    });
+  }, [countPoints, loaded]);
 
   const focusKey = focus?.key;
   const focusFeatures = focus?.features;

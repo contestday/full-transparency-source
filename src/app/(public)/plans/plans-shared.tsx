@@ -6,6 +6,7 @@ import type { PublicPlan } from "@/lib/public-data";
 import { needsOutcome } from "@/lib/plan-outcome";
 import { ZoneCard } from "@/components/zone-card";
 import type { BaseZone } from "@/lib/geofence/tiers";
+import { PlanMapButton } from "./plan-map-button";
 
 /** Past plan with no outcome yet (rendered per request, so "now" is the request time). */
 function awaitingOutcome(p: PublicPlan): boolean {
@@ -151,7 +152,13 @@ export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | 
           </li>
           <li className="inline-flex items-center gap-1.5">
             <Icon name="pin" className="h-4 w-4" />
-            {planWhere(p)}
+            {planPoint(p) ? (
+              <PlanMapButton plan={p} className="text-left font-semibold text-accent underline underline-offset-2">
+                {planWhere(p)}
+              </PlanMapButton>
+            ) : (
+              planWhere(p)
+            )}
           </li>
           <li className="inline-flex items-center gap-1.5">
             <Icon name="layers" className="h-4 w-4" />
@@ -169,6 +176,14 @@ export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | 
           </ol>
         )}
         {p.description && <p className="mt-2 whitespace-pre-line text-[15px]">{p.description}</p>}
+        {planPoint(p) && (
+          <PlanMapButton
+            plan={p}
+            className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-[var(--ft-radius-control)] border border-border bg-white px-3 text-sm font-semibold hover:bg-sky"
+          >
+            <Icon name="pin" className="h-4 w-4 text-accent" /> Show on map
+          </PlanMapButton>
+        )}
         {p.status === "changed" && (
           <p className="mt-2 rounded-lg bg-[#FFF7E6] px-3 py-2 text-sm text-[#6B4500]">This plan has changed since it was first published.</p>
         )}

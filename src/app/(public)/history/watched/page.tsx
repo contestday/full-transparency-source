@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Button, Input } from "@/components/ui";
-import { Container, PageHead, Segmented } from "@/components/design";
-import { historyRange, quickRanges } from "@/lib/history-range";
+import { Container, PageHead } from "@/components/design";
+import { RangePicker } from "@/components/range-picker";
+import { historyRange } from "@/lib/history-range";
 import { WatchedHistory } from "./watched-history";
 
 export const metadata: Metadata = { title: "Your History (Geofence)", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -23,26 +23,7 @@ export default async function WatchedHistoryPage({ searchParams }: PageProps<"/h
           </>
         }
       >
-        <div className="mb-4">
-          <Segmented
-            items={quickRanges(today).map((r) => ({
-              href: `/history/watched?from=${r.from}&to=${r.to}`,
-              label: r.label,
-              current: r.from === from && r.to === to,
-            }))}
-          />
-        </div>
-        <form className="flex flex-wrap items-end gap-3" method="get">
-          <label className="text-sm">
-            <span className="block font-semibold">From</span>
-            <Input type="date" name="from" defaultValue={from} max={to} className="w-auto bg-white" />
-          </label>
-          <label className="text-sm">
-            <span className="block font-semibold">To</span>
-            <Input type="date" name="to" defaultValue={to} className="w-auto bg-white" />
-          </label>
-          <Button type="submit">Show</Button>
-        </form>
+        <RangePicker basePath="/history/watched" today={today} from={from} to={to} />
       </PageHead>
       <Container className="space-y-4 pb-20 pt-6">
         <WatchedHistory from={from} to={to} />

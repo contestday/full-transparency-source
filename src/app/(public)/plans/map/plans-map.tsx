@@ -7,7 +7,7 @@ import { categoryLabel, STATUS_LABELS, type PlanStatus } from "@/lib/plans";
 import type { PublicPlan } from "@/lib/public-data";
 import { fmtDate } from "@/lib/format";
 
-export function PlansMap({ plans }: { plans: PublicPlan[] }) {
+export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full" }: { plans: PublicPlan[]; className?: string }) {
   const features = useMemo<MapFeature[]>(
     () =>
       plans.flatMap((p) => [p, ...p.extra_locations.filter((l) => l.public_lat != null).map((l) => ({ ...p, public_lat: l.public_lat, public_lng: l.public_lng, public_cell_size_m: l.public_cell_size_m, venue_name: l.venue_name, public_area_label: l.area_label }))]).filter((p) => p.public_lat != null).map((p) => {
@@ -36,5 +36,5 @@ export function PlansMap({ plans }: { plans: PublicPlan[] }) {
       }),
     [plans],
   );
-  return <LazyMap features={features} className="h-[65vh] min-h-80 w-full" ariaLabel="Plans map" />;
+  return <LazyMap features={features} className={className} ariaLabel="Plans map" />;
 }

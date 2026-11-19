@@ -138,7 +138,7 @@ function AreaDrawer({ value, onChange, context = [], tier, wideMode }: Props) {
             </>
           ) : (
             <>
-              Watch <strong>everywhere</strong> more than a set distance from my home. Home is never shown.
+              Watch <strong>everywhere</strong> more than a set distance from my home.
             </>
           )}
         </span>
@@ -161,7 +161,7 @@ function AreaDrawer({ value, onChange, context = [], tier, wideMode }: Props) {
       )}
       {tier && (
         <InfoButton>
-          <p>Home is never shown to you, and the circle is shifted at random by up to 1 km so it can&apos;t point to it.</p>
+          <p>The circle is centred near my home, shifted at random by up to 1 km. My home area is shown on the maps; movement inside it never is.</p>
         </InfoButton>
       )}
     </fieldset>

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LiveStatus } from "@/lib/live-status";
 import { loadSampleWatcher } from "@/lib/sample-watcher";
 import { loadWatchAreas } from "@/lib/watch-areas";
+import { loadHomeArea } from "@/lib/home";
 
 /** One area on the private maps, with what kind it is and whose. */
 export interface MapFence {
@@ -24,7 +25,7 @@ export interface MapFence {
 
 /** Geofences and located plans shown as overlays on private maps. */
 export async function loadMapContext(supabase: SupabaseClient) {
-  const [{ data: geofences }, { data: plans }, { data: live }, sample] = await Promise.all([
+  const [{ data: geofences }, { data: plans }, { data: live }, sample, homeArea] = await Promise.all([
     supabase
       .from("geofences_geojson")
       .select("id, reference, geojson, verification_status, origin, status, currently_inside, description, tier, wide_mode, shape_type, watcher_id")
@@ -37,6 +38,7 @@ export async function loadMapContext(supabase: SupabaseClient) {
       .limit(200),
     supabase.from("live_status").select("status").eq("id", 1).maybeSingle(),
     loadSampleWatcher().catch(() => null),
+    loadHomeArea().catch(() => null),
   ]);
   const planPoints = (plans ?? []).flatMap((p) => {
     const venue = p.venue as unknown as { lat: number | null; lng: number | null } | null;
@@ -89,5 +91,5 @@ export async function loadMapContext(supabase: SupabaseClient) {
       });
     }
   }
-  return { geofences: fences, plans: planPoints, liveStatus: (live?.status as LiveStatus | undefined) ?? "unknown" };
+  return { geofences: fences, plans: planPoints, liveStatus: (live?.status as LiveStatus | undefined) ?? "unknown", homeArea };
 }

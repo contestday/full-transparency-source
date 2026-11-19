@@ -15,6 +15,7 @@ interface Data {
   stopZones: Record<string, BaseZone>;
   watchZones: Record<string, WatchZone | null>;
   areaCount: number;
+  home_area?: { lat: number; lng: number; radius_m: number } | null;
 }
 
 /** Loads the history coloured for the watch link saved on this device. */
@@ -60,7 +61,7 @@ export function WatchedHistory({ from, to, token: givenToken }: { from: string; 
   return (
     <>
       {!data.areaCount && <Notice tone="blue">Your watch link has no areas yet, so this matches the public history.</Notice>}
-      <HistoryView records={data.records} route={data.route} stopZones={data.stopZones} watchZones={data.watchZones} />
+      <HistoryView records={data.records} route={data.route} stopZones={data.stopZones} watchZones={data.watchZones} homeArea={data.home_area ?? null} />
     </>
   );
 }

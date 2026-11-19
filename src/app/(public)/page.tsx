@@ -5,16 +5,21 @@ import { LiveStatusCard } from "@/components/live-status-card";
 import { InstallAppButton } from "@/components/pwa";
 import { getPublicLiveStatus, getPublicPlans, type PublicLiveStatus } from "@/lib/public-data";
 import { fmtDate } from "@/lib/format";
+import { SampleAlertsPrompt } from "@/components/sample-alerts-prompt";
+import { loadSampleWatcher } from "@/lib/sample-watcher";
+import { loadHomeArea } from "@/lib/home";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   let live: PublicLiveStatus | null = null;
   let nextPlan: { title: string; starts_at: string } | null = null;
+  const sample = await loadSampleWatcher().catch(() => null);
+  const sampleToken = sample?.locked ? sample.token : null;
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const [l, plans] = await Promise.all([getPublicLiveStatus(), getPublicPlans({ from: `${today}T00:00:00Z` })]);
-    live = l;
+    const [l, plans, home_area] = await Promise.all([getPublicLiveStatus(), getPublicPlans({ from: `${today}T00:00:00Z` }), loadHomeArea().catch(() => null)]);
+    live = { ...l, home_area };
     nextPlan = plans.find((p) => p.status !== "cancelled") ?? null;
   } catch (err) {
     console.error(err);
@@ -46,22 +51,7 @@ export default async function HomePage() {
       </section>
 
       <Container className="space-y-14 pb-20 pt-12">
-        <section className="flex flex-wrap items-center gap-5 rounded-[var(--ft-radius-card)] border-2 border-[#B45309] bg-[#FFF4D6] p-6 sm:p-8">
-          <Icon name="bell" className="h-10 w-10 shrink-0 text-[#B45309]" />
-          <div className="min-w-0 flex-1 basis-72 space-y-2">
-            <h2 className="text-[24px] font-bold sm:text-[28px]">Try it: get the sample&apos;s real alerts</h2>
-            <p className="text-[16px]">
-              The sample watcher has real areas set up. Turn on sample alerts and your phone gets the same alerts a watcher would,
-              as they happen, each clearly marked <strong>SAMPLE</strong>. Turn them off any time with one tap.
-            </p>
-          </div>
-          <Link
-            href="/sample#sample-alerts"
-            className="inline-flex h-12 items-center gap-2 rounded-[var(--ft-radius-control)] bg-[#B45309] px-5 font-semibold text-white hover:brightness-95"
-          >
-            Open the sample <span aria-hidden="true">→</span>
-          </Link>
-        </section>
+        <SampleAlertsPrompt sampleToken={sampleToken} />
         <section>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
             <h2 className="text-[26px] font-bold sm:text-[32px]">Explore</h2>

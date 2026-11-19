@@ -10,6 +10,7 @@ import { fmtDateTime, relativeAge } from "@/lib/format";
 import { forgetWatchLink, loadWatchLinks } from "@/lib/watch-links";
 import { useNow } from "@/lib/use-now";
 import type { PublicLiveStatus } from "@/lib/public-data";
+import { atHome, homeAreaFeatures } from "@/lib/home-area";
 
 
 type StatusKey = keyof typeof LIVE_STATUS_META;
@@ -106,14 +107,19 @@ export function LiveStatusCard({ initial }: { initial: PublicLiveStatus }) {
   const label = (watch ? WATCH_LABELS[status as keyof typeof WATCH_LABELS] : PUBLIC_LABELS[status as keyof typeof PUBLIC_LABELS]) || meta.label;
   const cellKm = ((s.cell_size_m ?? 1000) / 1000).toFixed(s.cell_size_m && s.cell_size_m < 1000 ? 2 : 1);
 
+  // In the home area there's no position: show the home area with a large marker instead.
+  const home = pub.home_area ?? null;
+  const inHome = Boolean(home) && atHome(status, s.public_lat);
   const features = useMemo<MapFeature[]>(() => {
+    if (inHome) return homeAreaFeatures(home, { here: true, color: meta.color, hereLabel: `${label}
+In my home area: movement inside it is never shown.` });
     if (s.public_lat == null || s.public_lng == null) return [];
     const c = { lat: s.public_lat, lng: s.public_lng };
     return [
       { type: "Feature", geometry: { type: "Polygon", coordinates: [gridCellRing(c, s.cell_size_m ?? 1000)] }, properties: { color: meta.color, opacity: 0.2, dashed: true } },
       { type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 10, label: `${label}\nApproximate area (about ${cellKm} km square)` } },
     ];
-  }, [s.public_lat, s.public_lng, s.cell_size_m, meta.color, label, cellKm]);
+  }, [s.public_lat, s.public_lng, s.cell_size_m, meta.color, label, cellKm, inHome, home]);
 
   if (pub.status === "disabled" && !watch) {
     return (
@@ -159,7 +165,7 @@ export function LiveStatusCard({ initial }: { initial: PublicLiveStatus }) {
         <div className="relative h-[240px] overflow-hidden rounded-[14px] sm:h-[280px]">
           <LazyMap features={features} className="h-full w-full" initialZoom={12} ariaLabel={`Map: approximate area, ${label}${moving ? ", on the move" : ""}`} />
           <span className="pointer-events-none absolute left-3 top-3 inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-white/95 px-3 text-xs font-medium">
-            <Icon name="pin" className="h-4 w-4 text-accent" /> Approximate area · about {cellKm} km square
+            <Icon name="pin" className="h-4 w-4 text-accent" /> {inHome ? "In my home area · movement here is never shown" : `Approximate area · about ${cellKm} km square`}
           </span>
         </div>
       ) : status === "unknown" ? (

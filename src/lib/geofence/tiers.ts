@@ -265,10 +265,7 @@ export function zoneAt(
   at?: number,
 ): Zone {
   const areas = at == null ? allAreas : allAreas.filter((a) => a.from == null || a.from <= at);
-  if (ownAreas.length && ownAreas.some((g) => pointInArea(p, g)) && !areas.some((a) => a.tier === "location" && pointInArea(p, a.geometry))) {
-    // My own noted areas are red for everyone (a watcher's location still wins).
-    return "red";
-  }
+  // A watcher's own areas come first; my noted areas are context only, used where none of theirs applies.
   let best: Zone | null = null;
   for (const a of areas) {
     const inside = pointInArea(p, a.geometry);
@@ -279,6 +276,7 @@ export function zoneAt(
     if (!best || (z === "red" && best === "amber")) best = z;
   }
   if (best) return best;
+  if (ownAreas.some((g) => pointInArea(p, g))) return "red";
   if (!okayZone) return "green";
   return haversineMeters(p, okayZone) <= okayZone.radiusM ? "green" : "yellow";
 }
