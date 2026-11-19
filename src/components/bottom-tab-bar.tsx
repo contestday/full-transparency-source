@@ -22,6 +22,20 @@ export function BottomTabBar() {
   const pathname = usePathname() ?? "/";
   const [more, setMore] = useState(false);
   const [watcher, setWatcher] = useState(false);
+  // "Your places" only once this device's watch link has areas; otherwise "Watch a place".
+  const [hasAreas, setHasAreas] = useState(false);
+  useEffect(() => {
+    const token = loadWatchLinks()[0]?.token;
+    if (!token) return;
+    let live = true;
+    fetch(`/api/watch/${token}/info`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((i: { valid?: boolean; areas?: number } | null) => live && setHasAreas(Boolean(i?.valid && (i.areas ?? 0) > 0)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [pathname]);
   const staff = useStaff();
   const status = useLiveStatus(true);
   useEffect(() => {
@@ -35,7 +49,7 @@ export function BottomTabBar() {
     { href: "/", label: "Home", icon: "home" },
     { href: "/history", label: "History", icon: "history" },
     { href: "/plans", label: "Plans", icon: "calendar" },
-    watcher ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch", icon: "pin" },
+    watcher && hasAreas ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch a place", icon: "pin" },
   ];
   const inTabs = (href: string) => tabs.some((t) => t.href === href);
   const moreItems = MENU.filter((m) => !inTabs(m.href) && (m.href !== "/history/watched" || watcher));
@@ -88,7 +102,6 @@ export function BottomTabBar() {
                     key={m.href}
                     href={m.href}
                     aria-current={on ? "page" : undefined}
-                    onClick={() => setMore(false)}
                     className={cn("flex min-h-[88px] flex-col items-start justify-between gap-2 rounded-2xl border p-3.5 font-semibold", on ? "border-2 border-ink" : "border-hairline bg-white")}
                   >
                     <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-accent">
@@ -101,7 +114,7 @@ export function BottomTabBar() {
               <ShareButton variant="tile" />
             </div>
             {chip && (
-              <Link href="/#status" onClick={() => setMore(false)} className="flex items-center gap-3 rounded-2xl border border-hairline p-4">
+              <Link href="/#status" className="flex items-center gap-3 rounded-2xl border border-hairline p-4">
                 <StatusDot status={chip} className="h-4 w-4" />
                 <span>
                   <span className="block text-xs font-bold uppercase tracking-[.08em] text-muted">Live status</span>

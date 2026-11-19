@@ -81,11 +81,12 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
                   const n = (groups.get(d) ?? []).length;
                   const dt = new Date(`${d}T12:00:00Z`);
                   return (
-                    <div
+                    <a
                       key={d}
                       role="listitem"
+                      href={n ? `#day-${d}` : `/plans/calendar${filterQuery(sp, ["category", "status"])}`}
                       aria-label={`${fmtDate(`${d}T12:00:00Z`, { dateStyle: "full" })}: ${n ? `${n} plan${n === 1 ? "" : "s"}` : "no plans"}`}
-                      className={`flex flex-col items-center gap-1 rounded-xl py-2 ${d === todayKey ? "bg-navy text-white" : "bg-white text-ink"} border border-hairline`}
+                      className={`flex flex-col items-center gap-1 rounded-xl py-2 ${d === todayKey ? "bg-navy text-white" : "bg-white text-ink hover:bg-ice"} border border-hairline`}
                     >
                       <span className="text-[11px] font-semibold uppercase opacity-80">{dt.toLocaleDateString("en-GB", { weekday: "short" })}</span>
                       <span className="font-display text-lg font-bold leading-none tabular-nums">{dt.getUTCDate()}</span>
@@ -94,7 +95,7 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
                           <span key={i} className={`h-1.5 w-1.5 rounded-full ${d === todayKey ? "bg-signal" : "bg-accent"}`} />
                         ))}
                       </span>
-                    </div>
+                    </a>
                   );
                 })}
               </div>
@@ -146,7 +147,7 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
         <WatchZonesProvider points={points}>
         <div className="space-y-6">
           {[...groups.entries()].map(([day, items]) => (
-            <section key={day}>
+            <section key={day} id={`day-${day}`} className="scroll-mt-28">
               <h2 className="mb-3 text-lg font-bold">{fmtDate(`${day}T12:00:00Z`, { dateStyle: "full" })}</h2>
               <div className="space-y-3">
                 {items.map((p) => (

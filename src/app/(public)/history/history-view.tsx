@@ -11,6 +11,7 @@ import { BASE_ZONE_LABEL, WATCH_ZONE_LABEL, ZONE_COLOR, type BaseZone, type Watc
 import { fmtDate, fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
 import type { PublicHistoryRecord } from "@/lib/public-data";
 import { homeAreaFeatures, type HomeAreaShape } from "@/lib/home-area";
+import { useNow } from "@/lib/use-now";
 import { PlaceTimes } from "./place-visits";
 import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 
@@ -37,25 +38,39 @@ const londonMinutes = (iso: string) => {
 /** Status key for a card colour (for tints): base zones and the watcher's own. */
 const toneOf = (key: string | null) => (key === "green" || key === "yellow" || key === "red" || key === "amber" || key === "purple" ? key : "unknown");
 
+/** Ribbon colours besides the stays: travelling, and time with nothing published (usually at home). */
+const TRAVEL = "#9FB4C9";
+const HOME_TIME = "#A8E0C9";
+const TRACK_GAP_MIN = 20;
+
 /**
- * A day as a 24-hour bar: each stay in its colour, the rest light grey
- * (travelling, or nothing published). Text alternative in its label.
+ * A day as a 24-hour bar: each stay in its colour, travelling (route samples)
+ * in grey-blue, and the rest in light green: nothing is published inside my
+ * home area, so unpublished time is usually time at home. Later today stays blank.
  */
-function DayRibbon({ stays, colourOf }: { stays: PublicHistoryRecord[]; colourOf: (r: PublicHistoryRecord) => string }) {
-  const segs = [...stays]
-    .sort((a, b) => a.observed_at.localeCompare(b.observed_at))
-    .map((r) => {
-      const start = londonMinutes(r.observed_at);
-      const endRaw = r.observed_until ? londonMinutes(r.observed_until) : start + 10;
-      const end = r.observed_until && londonDayKey(r.observed_until) !== londonDayKey(r.observed_at) ? 1440 : Math.max(endRaw, start + 4);
-      return { start, end, color: colourOf(r), name: stayName(r) };
-    });
-  const label = segs.length ? `Stays this day: ${segs.map((x) => `${x.name} ${String(Math.floor(x.start / 60)).padStart(2, "0")}:${String(x.start % 60).padStart(2, "0")}`).join(", ")}` : "No stays this day";
+function DayRibbon({ stays, tracks, colourOf, nowMin }: { stays: PublicHistoryRecord[]; tracks: PublicHistoryRecord[]; colourOf: (r: PublicHistoryRecord) => string; nowMin: number }) {
+  const dayEnd = nowMin; // 1440 for past days
+  const segs: { start: number; end: number; color: string; name: string }[] = [];
+  // Travelling: between route samples that are close together.
+  const t = [...tracks].map((r) => londonMinutes(r.observed_at)).sort((x, y) => x - y);
+  for (let i = 0; i < t.length; i++) {
+    const end = i + 1 < t.length && t[i + 1] - t[i] <= TRACK_GAP_MIN ? t[i + 1] : t[i] + 5;
+    segs.push({ start: t[i], end: Math.min(end, dayEnd), color: TRAVEL, name: "Travelling" });
+  }
+  for (const r of [...stays].sort((x, y) => x.observed_at.localeCompare(y.observed_at))) {
+    const start = londonMinutes(r.observed_at);
+    const endRaw = r.observed_until ? londonMinutes(r.observed_until) : start + 10;
+    const end = r.observed_until && londonDayKey(r.observed_until) !== londonDayKey(r.observed_at) ? dayEnd : Math.max(endRaw, start + 4);
+    segs.push({ start, end: Math.min(end, dayEnd), color: colourOf(r), name: stayName(r) });
+  }
+  const label = `${segs.filter((x) => x.name !== "Travelling").length ? `Stays this day: ${segs.filter((x) => x.name !== "Travelling").map((x) => `${x.name} ${String(Math.floor(x.start / 60)).padStart(2, "0")}:${String(x.start % 60).padStart(2, "0")}`).join(", ")}. ` : ""}The rest of the day: travelling, or nothing published (usually at home).`;
   return (
     <div className="mb-3">
       <div className="relative h-2.5 overflow-hidden rounded-full bg-grey-bg" role="img" aria-label={label}>
+        {/* Up to now, unpublished time is shown as (probably) home. */}
+        <span className="absolute inset-y-0 left-0" style={{ width: `${(dayEnd / 1440) * 100}%`, background: HOME_TIME }} />
         {segs.map((x, i) => (
-          <span key={i} className="absolute inset-y-0" style={{ left: `${(x.start / 1440) * 100}%`, width: `${((x.end - x.start) / 1440) * 100}%`, background: x.color }} />
+          <span key={i} className="absolute inset-y-0" style={{ left: `${(x.start / 1440) * 100}%`, width: `${(Math.max(0, x.end - x.start) / 1440) * 100}%`, background: x.color }} />
         ))}
       </div>
       <div className="mt-0.5 flex justify-between text-[11px] text-muted tabular-nums" aria-hidden="true">
@@ -66,6 +81,23 @@ function DayRibbon({ stays, colourOf }: { stays: PublicHistoryRecord[]; colourOf
         <span>24:00</span>
       </div>
     </div>
+  );
+}
+
+/** The key for the day ribbons. */
+function RibbonKey() {
+  const item = (color: string, text: string) => (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="h-2.5 w-4 rounded-full" style={{ background: color }} aria-hidden="true" />
+      {text}
+    </span>
+  );
+  return (
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+      {item("#007B60", "Stay (in its colour)")}
+      {item(TRAVEL, "Travelling")}
+      {item(HOME_TIME, "Home area: never published")}
+    </p>
   );
 }
 const NEUTRAL = "#245AD6";
@@ -160,15 +192,21 @@ export function HistoryView({
     }
     return { stays: visits.length, places, okayPct: total > 0 ? Math.round((okay / total) * 100) : null };
   }, [visits, stopZones]);
+  const now = useNow();
+  const todayKey = now ? londonDayKey(new Date(now).toISOString()) : "";
+  const nowMin = now ? londonMinutes(new Date(now).toISOString()) : 1440;
   const colourOf = (r: PublicHistoryRecord) => cardColour(stopZones[r.id] ?? null, watchZones?.[r.id] ?? null).color;
 
   const days = useMemo(() => {
-    const m = new Map<string, { visits: PublicHistoryRecord[]; samples: number }>();
+    const m = new Map<string, { visits: PublicHistoryRecord[]; samples: number; tracks: PublicHistoryRecord[] }>();
     for (const r of records) {
       const k = londonDayKey(r.observed_at);
-      const d = m.get(k) ?? { visits: [], samples: 0 };
+      const d = m.get(k) ?? { visits: [], samples: 0, tracks: [] };
       if (r.kind === "visit") d.visits.push(r);
-      else d.samples++;
+      else {
+        d.samples++;
+        d.tracks.push(r);
+      }
       m.set(k, d);
     }
     // Latest day first, and within a day the latest stop first.
@@ -222,6 +260,7 @@ export function HistoryView({
             {stats.okayPct != null && <StatChip tone="green" dot value={`${stats.okayPct}%`} label="of stay time in okay zone" />}
           </div>
         )}
+        {records.length > 0 && <RibbonKey />}
         {!records.length && (
           <EmptyState icon="history" title="No published records for these dates.">
             Usually this means I stayed near home, which is never shown. Try a different date range.
@@ -236,7 +275,7 @@ export function HistoryView({
                 {d.samples ? ` · route recorded` : ""}
               </span>
             </div>
-            <DayRibbon stays={d.visits} colourOf={colourOf} />
+            <DayRibbon stays={d.visits} tracks={d.tracks} colourOf={colourOf} nowMin={day === todayKey ? nowMin : 1440} />
             {d.visits.length ? (
               <ol className="space-y-2.5">
                 {d.visits.map((r) => {

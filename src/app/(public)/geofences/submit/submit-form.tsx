@@ -360,13 +360,17 @@ export function GeofenceSubmitForm({
           this one ends at the same moment: both are kept in the dated record.
         </p>
       )}
-      <div className="sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-wrap gap-2 border-t border-hairline bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 lg:bottom-0">
+      <div className="sticky bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-[45] -mx-4 flex flex-wrap gap-2 border-t border-hairline bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 lg:bottom-0">
         {step < 3 ? (
-          <Button type="button" size="lg" className="flex-1 sm:flex-none" onClick={next}>
+          // Separate keys: the Save button must be a new element, or the click on Next could also submit.
+          <Button key="next" type="button" size="lg" className="flex-1 sm:flex-none" onClick={(e) => {
+            e.preventDefault();
+            next();
+          }}>
             Next <Icon name="chevron" className="h-4 w-4" />
           </Button>
         ) : (
-          <Button type="submit" size="lg" className="flex-1 sm:flex-none" disabled={busy}>
+          <Button key="save" type="submit" size="lg" className="flex-1 sm:flex-none" disabled={busy}>
             {busy ? "Saving…" : editing ? "Save changes" : watchToken ? "Add area" : "Save and get my watch link"}
           </Button>
         )}

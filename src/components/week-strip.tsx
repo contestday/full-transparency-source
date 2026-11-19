@@ -23,13 +23,15 @@ const hm = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 
  * colour. Today outlined; days still to come dashed. Each day links to its
  * History, and the whole strip has a text description.
  */
-export function WeekStrip({ days, today }: { days: WeekDay[]; today: string }) {
-  const max = Math.max(60, ...days.map((d) => d.green + d.yellow + d.red));
+/** Unpublished time: nothing inside my home area is published, so it is usually time at home. */
+const HOME_TIME = "#A8E0C9";
+
+export function WeekStrip({ days, today, nowMin = 1440 }: { days: WeekDay[]; today: string; nowMin?: number }) {
   const total = days.reduce((s, d) => s + d.green + d.yellow + d.red, 0);
   const okay = days.reduce((s, d) => s + d.green, 0);
   const summary = days
     .filter((d) => d.date <= today)
-    .map((d) => `${new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long" })}: ${d.green + d.yellow + d.red ? SEG.filter((s) => d[s.key]).map((s) => `${hm(d[s.key])} ${s.label}`).join(", ") : "no stays published"}`)
+    .map((d) => `${new Date(`${d.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long" })}: ${d.green + d.yellow + d.red ? SEG.filter((s) => d[s.key]).map((s) => `${hm(d[s.key])} ${s.label}`).join(", ") : "no stays published"}, the rest not published (usually at home)`)
     .join(". ");
   return (
     <div className="space-y-3">
@@ -46,8 +48,10 @@ export function WeekStrip({ days, today }: { days: WeekDay[]; today: string }) {
               aria-label={`History for ${d.date}`}
               className={`flex h-full flex-col justify-end overflow-hidden rounded-md bg-grey-bg ${d.date === today ? "outline outline-2 outline-offset-2 outline-ink" : ""}`}
             >
-              <span className="flex flex-col overflow-hidden" style={{ height: `${Math.max(sum ? 8 : 0, (sum / max) * 100)}%` }}>
+              {/* A whole day, top to bottom: stays in their colours, the rest light green (home area, never published). */}
+              <span className="flex flex-col overflow-hidden" style={{ height: `${((d.date === today ? nowMin : 1440) / 1440) * 100}%` }}>
                 {SEG.map((s) => (d[s.key] ? <span key={s.key} style={{ flex: d[s.key], background: s.color }} /> : null))}
+                <span style={{ flex: Math.max(0, (d.date === today ? nowMin : 1440) - sum), background: HOME_TIME }} />
               </span>
             </Link>
           );
@@ -68,6 +72,10 @@ export function WeekStrip({ days, today }: { days: WeekDay[]; today: string }) {
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full" style={{ background: STATUS_TONE.yellow.dot }} />
           Outside it
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ background: HOME_TIME }} />
+          Home area: never published
         </span>
       </div>
       {total > 0 && (

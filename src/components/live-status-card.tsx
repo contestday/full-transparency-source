@@ -189,7 +189,7 @@ In my home area: movement inside it is never shown.` });
       )}
 
       <div className="space-y-4 p-4 sm:p-6">
-        {!watch && week && today && (
+        {week && today && (
           <div className="space-y-2.5">
             <div className="flex items-baseline justify-between">
               <p className="text-[15px] font-bold">This week</p>
@@ -197,7 +197,7 @@ In my home area: movement inside it is never shown.` });
                 Open in History
               </Link>
             </div>
-            <WeekStrip days={week} today={today} />
+            <WeekStrip days={week} today={today} nowMin={now ? (() => { const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now)); return Number(p.find((x) => x.type === "hour")?.value) * 60 + Number(p.find((x) => x.type === "minute")?.value); })() : 1440} />
           </div>
         )}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline pt-3 text-sm">
