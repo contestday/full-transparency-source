@@ -7,7 +7,7 @@ test("landing page shows product name and primary navigation", async ({ page }) 
   const menuButton = page.getByRole("button", { name: "Open menu" });
   if (await menuButton.isVisible()) await menuButton.click(); // mobile
   const nav = page.getByRole("navigation", { name: "Primary" }).filter({ visible: true });
-  for (const label of ["Home", "History", "Upcoming Plans", "Watch an Area", "Contact", "Privacy", "About"]) {
+  for (const label of ["Home", "History", "Plans", "Watch", "Message", "Privacy", "FAQs"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
 });
@@ -16,13 +16,14 @@ test("public pages render", async ({ page }) => {
   for (const [path, heading] of [
     ["/history", "Where I've been"],
     ["/plans", "Where I'm going"],
-    ["/plans/calendar", "Calendar"],
-    ["/plans/map", "Plans map"],
-    ["/report", "Get in touch"],
-    ["/geofences/submit", "Watch an area"],
+    ["/plans/calendar", "Where I'm going"],
+    ["/plans/map", "Where I'm going"],
+    ["/report", "Message me"],
+    ["/geofences/submit", "Watch a place"],
     ["/watch", "My watch links"],
-    ["/privacy", "Watching anonymously"],
-    ["/about", "About Full Transparency"],
+    ["/privacy", "Your privacy"],
+    ["/privacy/policy", "Privacy policy"],
+    ["/about", "Questions and answers"],
   ]) {
     await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();

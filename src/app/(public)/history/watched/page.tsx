@@ -5,28 +5,28 @@ import { RangePicker } from "@/components/range-picker";
 import { historyRange } from "@/lib/history-range";
 import { WatchedHistory } from "./watched-history";
 
-export const metadata: Metadata = { title: "Your History (Geofence)", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Your view", robots: { index: false, follow: false }, referrer: "no-referrer" };
 export const dynamic = "force-dynamic";
 
 export default async function WatchedHistoryPage({ searchParams }: PageProps<"/history/watched">) {
-  const { today, from, to } = historyRange(await searchParams);
+  const sp = await searchParams;
+  const { today, from, to } = historyRange(sp);
+  const placeQ = typeof sp.place === "string" ? sp.place.trim().slice(0, 100) : "";
   return (
     <>
       <PageHead
-        eyebrow="Your History (Geofence)"
         title="Where I've been, in your colours"
         art="history"
         lead={
           <>
-            The same history everyone can see, coloured for the watch link saved on this device: amber in your Wish areas, red in
-            your Want areas, purple at your Locations. Each area colours only what happened after you set it. Only you see these colours. <Link className="text-accent underline" href={`/history?from=${from}&to=${to}`}>Public history</Link> shows what everyone else sees.
+            Only you see these colours. <Link className="text-accent underline" href={`/history?from=${from}&to=${to}`}>Public view</Link>
           </>
         }
       >
-        <RangePicker basePath="/history/watched" today={today} from={from} to={to} />
+        <RangePicker basePath="/history/watched" today={today} from={from} to={to} place={placeQ} />
       </PageHead>
       <Container className="space-y-4 pb-20 pt-6">
-        <WatchedHistory from={from} to={to} />
+        <WatchedHistory from={from} to={to} place={placeQ} />
       </Container>
     </>
   );

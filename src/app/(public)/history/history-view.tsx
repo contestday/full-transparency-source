@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
-import { EmptyState, LegendItem, MapFrame } from "@/components/design";
+import { EmptyState, Icon, LegendItem, MapFrame } from "@/components/design";
 import { cn } from "@/components/ui";
 import { cardColour, onZone } from "@/components/zone-card";
 import { gridCellRing } from "@/lib/geo";
@@ -11,7 +11,7 @@ import { BASE_ZONE_LABEL, WATCH_ZONE_LABEL, ZONE_COLOR, type BaseZone, type Watc
 import { fmtDate, fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
 import type { PublicHistoryRecord } from "@/lib/public-data";
 import { homeAreaFeatures, type HomeAreaShape } from "@/lib/home-area";
-import { PlaceVisits } from "./place-visits";
+import { PlaceTimes } from "./place-visits";
 import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 
 /** "1 h 20 min" between two times, or "" if unknown. */
@@ -96,6 +96,11 @@ export function HistoryView({
     return f;
   }, [route, visits, selected, stopZones, watchZones, homeArea, searchArea]);
 
+  // A place search: zoom to the place.
+  const searchFocus = useMemo(() => (searchArea ? { key: 1, features: [{ type: "Feature", geometry: searchArea, properties: {} } as MapFeature] } : null), [searchArea]);
+
+  const [timesFor, setTimesFor] = useState<PublicHistoryRecord | null>(null);
+
   const days = useMemo(() => {
     const m = new Map<string, { visits: PublicHistoryRecord[]; samples: number }>();
     for (const r of records) {
@@ -138,11 +143,16 @@ export function HistoryView({
               </>
             }
           >
-            <LazyMap features={features} className="h-[300px] w-full sm:h-[460px] lg:h-[620px]" ariaLabel="Map of published movement: routes and stays" />
+            <LazyMap
+              features={features}
+              fit={searchArea ? false : true}
+              focus={searchFocus}
+              className="h-[300px] w-full sm:h-[460px] lg:h-[620px]" ariaLabel="Map of published movement: routes and stays" />
           </MapFrame>
         </div>
       </div>
 
+      {timesFor && <PlaceTimes record={timesFor} name={stayName(timesFor)} onClose={() => setTimesFor(null)} />}
       <div className="min-w-0 grow-[5] basis-[380px] space-y-6" aria-label="Chronological timeline">
         {!records.length && (
           <EmptyState icon="history" title="No published records for these dates.">
@@ -191,7 +201,11 @@ export function HistoryView({
                   return (
                     <li key={r.id}>
                       {card}
-                      {on && <PlaceVisits record={r} />}
+                      {on && (
+                        <button type="button" onClick={() => setTimesFor(r)} className="mt-1 inline-flex h-9 items-center gap-1.5 rounded-[var(--ft-radius-control)] border border-border bg-white px-3 text-sm font-semibold hover:bg-sky">
+                          <Icon name="clock" className="h-4 w-4 text-accent" /> All times here
+                        </button>
+                      )}
                     </li>
                   );
                 })}

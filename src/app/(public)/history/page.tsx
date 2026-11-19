@@ -13,7 +13,7 @@ import { loadHomeArea } from "@/lib/home";
 import { lookupPlace } from "@/lib/place-lookup";
 import { pointInArea } from "@/lib/geofence/area-geometry";
 
-export const metadata: Metadata = { title: "Public History" };
+export const metadata: Metadata = { title: "History" };
 export const dynamic = "force-dynamic";
 
 export default async function HistoryPage({ searchParams }: PageProps<"/history">) {
@@ -41,13 +41,11 @@ export default async function HistoryPage({ searchParams }: PageProps<"/history"
   return (
     <>
       <PageHead
-        eyebrow="Public History"
         title="Where I've been"
         art="history"
         lead={
           <>
-            Places I stayed and the routes between them, as reported by GPS. Last published{" "}
-            <strong className="text-ink">{fmtDateTime(data.lastPublishedAt)}</strong>.
+            My stays and routes on a map. Updated <strong className="text-ink">{fmtDateTime(data.lastPublishedAt)}</strong>.
           </>
         }
       >
@@ -60,7 +58,7 @@ export default async function HistoryPage({ searchParams }: PageProps<"/history"
           </Notice>
         )}
         {failed && <Notice tone="red">History could not be loaded. Please try again later.</Notice>}
-        {placeQ && !place && <Notice tone="amber">No place called “{placeQ}” was found. Try a town, village, island or postcode.</Notice>}
+        {placeQ && !place && <Notice tone="amber">No place called “{placeQ}” was found. Try a town, village or postcode.</Notice>}
         {place && (
           <Notice tone="blue" title={`Showing only ${place.label}`}>
             {data.records.filter((r) => r.kind === "visit").length} stays there in these dates. The place is outlined on the map.
@@ -68,7 +66,7 @@ export default async function HistoryPage({ searchParams }: PageProps<"/history"
         )}
         <WatcherOnly>
           <p className="text-sm">
-            <Link className="font-semibold text-accent underline" href={`/history/watched?from=${from}&to=${to}`}>See this in your colours (Your History)</Link>
+            <Link className="font-semibold text-accent underline" href={`/history/watched?from=${from}&to=${to}`}>See this in your colours</Link>
           </p>
         </WatcherOnly>
         <HistoryView records={data.records} route={route} stopZones={stopZones} homeArea={await loadHomeArea().catch(() => null)} searchArea={place?.geometry ?? null} />

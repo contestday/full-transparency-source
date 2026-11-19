@@ -6,6 +6,8 @@ import { getPublicHistory } from "@/lib/public-data";
 import { colourHistory, loadPublicZoneContext } from "@/lib/zones";
 import { historyRange, routesShown } from "@/lib/history-range";
 import { loadHomeArea } from "@/lib/home";
+import { lookupPlace } from "@/lib/place-lookup";
+import { pointInArea } from "@/lib/geofence/area-geometry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,9 +31,13 @@ export const GET = handle(async (request: Request, ctx: Ctx) => {
     getPublicHistory(`${from}T00:00:00Z`, `${to}T23:59:59.999Z`, { stopsOnly: !routesShown(from, to) }),
     loadHomeArea().catch(() => null),
   ]);
-  const colours = colourHistory(history.records, zctx, zoneAreas(areas));
+  // Place search: only what happened inside the searched place.
+  const placeQ = (sp.get("place") ?? "").trim().slice(0, 100);
+  const place = placeQ.length >= 2 ? await lookupPlace(placeQ) : null;
+  const records = place ? history.records.filter((r) => pointInArea({ lat: r.public_lat, lng: r.public_lng }, place.geometry)) : history.records;
+  const colours = colourHistory(records, zctx, zoneAreas(areas));
   return json(
-    { from, to, records: history.records, ...colours, areaCount: areas.length, home_area: homeArea },
+    { from, to, records, ...colours, areaCount: areas.length, home_area: homeArea, place: placeQ ? (place ?? false) : null },
     { headers: { "cache-control": "private, no-store", "referrer-policy": "no-referrer" } },
   );
 });

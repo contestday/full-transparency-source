@@ -8,6 +8,7 @@ import { loadWatchLinks } from "@/lib/watch-links";
 import type { PublicHistoryRecord } from "@/lib/public-data";
 import type { BaseZone, WatchZone, Zone } from "@/lib/geofence/tiers";
 import { HistoryView } from "../history-view";
+import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 
 interface Data {
   records: PublicHistoryRecord[];
@@ -16,10 +17,12 @@ interface Data {
   watchZones: Record<string, WatchZone | null>;
   areaCount: number;
   home_area?: { lat: number; lng: number; radius_m: number } | null;
+  /** Place search: the place found, false when none was found, null when not searching. */
+  place?: { label: string; geometry: AreaGeometry } | false | null;
 }
 
 /** Loads the history coloured for the watch link saved on this device. */
-export function WatchedHistory({ from, to, token: givenToken }: { from: string; to: string; token?: string }) {
+export function WatchedHistory({ from, to, place = "", token: givenToken }: { from: string; to: string; place?: string; token?: string }) {
   const [state, setState] = useState<"loading" | "nolink" | "error" | "ready">("loading");
   const [data, setData] = useState<Data | null>(null);
 
@@ -32,7 +35,7 @@ export function WatchedHistory({ from, to, token: givenToken }: { from: string; 
     }
     let cancelled = false;
     setState("loading");
-    fetch(`/api/watch/${token}/history?from=${from}&to=${to}`, { cache: "no-store" })
+    fetch(`/api/watch/${token}/history?from=${from}&to=${to}${place ? `&place=${encodeURIComponent(place)}` : ""}`, { cache: "no-store" })
       .then(async (r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -46,12 +49,12 @@ export function WatchedHistory({ from, to, token: givenToken }: { from: string; 
     return () => {
       cancelled = true;
     };
-  }, [from, to, givenToken]);
+  }, [from, to, place, givenToken]);
 
   if (state === "nolink") {
     return (
       <EmptyState icon="eye" title="No watch link on this device.">
-        Your History shows my history in the colours of your own areas. <Link className="text-accent underline" href="/geofences/submit">Set up an area</Link>, or
+        This shows my history in the colours of your own areas. <Link className="text-accent underline" href="/geofences/submit">Set up an area</Link>, or
         open your private watch link on this device once, then come back. Or look at the <Link className="text-accent underline" href="/history">public history</Link>.
       </EmptyState>
     );
@@ -61,7 +64,9 @@ export function WatchedHistory({ from, to, token: givenToken }: { from: string; 
   return (
     <>
       {!data.areaCount && <Notice tone="blue">Your watch link has no areas yet, so this matches the public history.</Notice>}
-      <HistoryView records={data.records} route={data.route} stopZones={data.stopZones} watchZones={data.watchZones} homeArea={data.home_area ?? null} />
+      {data.place === false && <Notice tone="amber">No place called “{place}” was found. Try a town, village or postcode.</Notice>}
+      {data.place && <Notice tone="blue" title={`Showing only ${data.place.label}`}>{data.records.filter((r) => r.kind === "visit").length} stays there in these dates.</Notice>}
+      <HistoryView records={data.records} route={data.route} stopZones={data.stopZones} watchZones={data.watchZones} homeArea={data.home_area ?? null} searchArea={data.place ? data.place.geometry : null} />
     </>
   );
 }

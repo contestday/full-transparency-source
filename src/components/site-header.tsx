@@ -11,15 +11,15 @@ import { loadWatchLinks } from "@/lib/watch-links";
 
 const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: "/", label: "Home", icon: "home" },
-  { href: "/history", label: "Public History", icon: "history" },
-  { href: "/history/watched", label: "Your History (Geofence)", icon: "eye" },
-  { href: "/geofences/submit", label: "Set Up Geofences", icon: "pin" },
-  { href: "/watch", label: "Your Geofences", icon: "layers" },
-  { href: "/sample", label: "Sample Geofence View (Live)", icon: "eye" },
-  { href: "/plans", label: "Upcoming Plans", icon: "calendar" },
-  { href: "/report", label: "Contact", icon: "chat" },
+  { href: "/history", label: "History", icon: "history" },
+  { href: "/history/watched", label: "Your view", icon: "eye" },
+  { href: "/geofences/submit", label: "Watch", icon: "pin" },
+  { href: "/watch", label: "Your places", icon: "layers" },
+  { href: "/sample", label: "Sample", icon: "eye" },
+  { href: "/plans", label: "Plans", icon: "calendar" },
+  { href: "/report", label: "Message", icon: "chat" },
   { href: "/privacy", label: "Privacy", icon: "lock" },
-  { href: "/about", label: "About", icon: "info" },
+  { href: "/about", label: "FAQs", icon: "info" },
 ];
 
 type Status = keyof typeof LIVE_STATUS_META;
@@ -72,7 +72,7 @@ export function SiteHeader() {
       .then((b) => setStaff(Boolean(b?.staff)))
       .catch(() => undefined);
   }, []);
-  // "Your History" only for watchers: this device has a watch link saved.
+  // "Where I.ve been: your view" only for watchers: this device has a watch link saved.
   const [watcher, setWatcher] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

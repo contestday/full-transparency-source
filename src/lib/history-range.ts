@@ -28,11 +28,14 @@ export function quickRanges(today: string): QuickRange[] {
   ];
 }
 
-/** The requested range (default: today). */
+/** Monday of the week containing `day` (London days). */
+export const weekStart = (day: string) => shiftDay(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7));
+
+/** The requested range (default: this week). */
 export function historyRange(sp: { from?: unknown; to?: unknown }) {
   const today = londonDayKey(new Date().toISOString());
   const to = isDate(sp.to) ? sp.to : today;
-  let from = isDate(sp.from) ? sp.from : to;
+  let from = isDate(sp.from) ? sp.from : isDate(sp.to) ? to : weekStart(today);
   if (from > to) from = to;
   if (from < ALL_TIME_FROM) from = ALL_TIME_FROM;
   return { today, from, to };

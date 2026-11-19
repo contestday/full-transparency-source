@@ -93,7 +93,7 @@ export default async function PlansCalendarPage({ searchParams }: PageProps<"/pl
 
   return (
     <>
-      <PageHead eyebrow="Upcoming plans" title="Calendar" art="plans" lead="Published plans by date.">
+      <PageHead title="Where I'm going" art="plans">
         <PlansTabs active="calendar" query={filterQuery(sp, ["category", "status"])} />
       </PageHead>
       <Container className="space-y-5 pb-20 pt-6">

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Artwork } from "@/components/brand";
 import { CardLink, Container, Icon } from "@/components/design";
 import { LiveStatusCard } from "@/components/live-status-card";
-import { InstallAppButton } from "@/components/pwa";
 import { getPublicLiveStatus, getPublicPlans, type PublicLiveStatus } from "@/lib/public-data";
 import { fmtDate } from "@/lib/format";
 import { SampleAlertsPrompt } from "@/components/sample-alerts-prompt";
@@ -10,6 +9,9 @@ import { loadSampleWatcher } from "@/lib/sample-watcher";
 import { loadHomeArea } from "@/lib/home";
 
 export const dynamic = "force-dynamic";
+
+/** Why I publish this: the first thing anyone reads. (Draft: the owner to confirm the wording.) */
+const WHY = "I publish where I go so that anyone who's concerned can check for themselves, rather than take my word for it.";
 
 export default async function HomePage() {
   let live: PublicLiveStatus | null = null;
@@ -32,10 +34,8 @@ export default async function HomePage() {
           <div className="lg:col-span-5 lg:pt-6">
             <p className="text-xs font-bold uppercase tracking-[.08em] text-muted">Open by choice</p>
             <h1 className="mt-2 text-[34px] font-bold leading-[1.08] sm:text-[56px] sm:leading-[1.04]">Full Transparency</h1>
-            <p className="mt-4 text-[17px] leading-relaxed text-muted sm:text-lg">
-              Where I&apos;ve been, where I&apos;m going and, right now, whether I&apos;m within my usual area. Shared openly,
-              with my home kept private.
-            </p>
+            <p className="mt-4 text-[17px] leading-relaxed text-ink sm:text-lg">{WHY}</p>
+            <p className="mt-2 text-[15px] text-muted">Where I&apos;ve been, where I&apos;m going, and where I am now.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/history" className="inline-flex h-12 items-center gap-2 rounded-[var(--ft-radius-control)] bg-accent px-5 font-semibold text-white hover:bg-accent-hover">
                 <Icon name="history" /> See my history
@@ -56,53 +56,24 @@ export default async function HomePage() {
           <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
             <h2 className="text-[26px] font-bold sm:text-[32px]">Explore</h2>
             <Link href="/about" className="text-sm font-semibold text-accent hover:underline">
-              About this site and what&apos;s shown →
+              FAQs →
             </Link>
           </div>
           <div className="grid gap-6 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-            <CardLink href="/history" icon="history" title="Public History" text="Where I've been, on a map and timeline, including routes." footer="Updated every few minutes" />
+            <CardLink href="/history" icon="history" title="History" text="Where I've been, on a map." footer="Updated every few minutes" />
             <CardLink
               href="/plans"
               icon="calendar"
-              title="Upcoming Plans"
-              text="Things I've planned, as a list, calendar or map."
+              title="Plans"
+              text="What I plan to do."
               footer={nextPlan ? `Next: ${fmtDate(nextPlan.starts_at, { dateStyle: undefined, weekday: "short", day: "numeric", month: "short" })}` : "Nothing planned yet"}
             />
-            <CardLink href="/geofences/submit" icon="eye" title="Set Up Geofences" text="Choose places that matter to you and see, privately, if I'm there." footer="Private link, no account" />
-            <CardLink href="/sample" icon="layers" title="Sample Geofence View (Live)" text="See exactly what someone watching an area sees, compared with the public." footer="Read-only example" />
-            <CardLink href="/report" icon="chat" title="Contact" text="Ask a question or send feedback, anonymously if you like." footer="Only I read it" />
+            <CardLink href="/geofences/submit" icon="eye" title="Watch" text="Get told if I go somewhere that matters to you." footer="Private, no account" />
+            <CardLink href="/sample" icon="layers" title="Sample" text="Try a watcher's view." footer="Read-only example" />
+            <CardLink href="/report" icon="chat" title="Message" text="Message me anonymously." footer="Only I read it" />
           </div>
         </section>
 
-        <section className="rounded-[var(--ft-radius-card)] bg-white p-6 sm:p-8">
-          <h2 className="text-[22px] font-bold">How publication works</h2>
-          <ol className="mt-5 grid gap-6 md:grid-cols-3">
-            {[
-              ["pin", "Recorded by GPS", "My phone reports its position every few minutes."],
-              ["lock", "Home kept private", "Nothing near my home is ever shown. Everywhere else, the history shows the recorded GPS positions."],
-              ["eye", "Published openly", "The live status, history and plans appear here for anyone to see."],
-            ].map(([icon, title, text], i) => (
-              <li key={title} className="flex gap-4">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-sky text-accent">
-                  <Icon name={icon as "pin"} className="h-6 w-6" />
-                </span>
-                <span>
-                  <span className="text-xs font-bold uppercase tracking-[.08em] text-muted">Step {i + 1}</span>
-                  <span className="block font-semibold">{title}</span>
-                  <span className="block text-sm text-muted">{text}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--ft-radius-card)] border border-border bg-white p-6">
-          <div>
-            <h2 className="text-lg font-bold">Keep it on your home screen</h2>
-            <p className="text-sm text-muted">Install Full Transparency as an app for quick access to the live status.</p>
-          </div>
-          <InstallAppButton />
-        </section>
       </Container>
     </>
   );

@@ -100,7 +100,7 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   const [focus, setFocus] = useState<{ key: number; features: MapFeature[] } | null>(null);
   const [copied, setCopied] = useState(false);
   // Which period's journey: Today, Yesterday, This week, This month, This year or All time.
-  const [rangeKey, setRangeKey] = useState("today");
+  const [rangeKey, setRangeKey] = useState("week");
   const [journeyTick, setJourneyTick] = useState(0);
   // The area whose entries and exits are open in the overlay.
   const [visitsFor, setVisitsFor] = useState<Area | null>(null);
@@ -147,8 +147,8 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
     const r = rangeKey === "today" ? null : (quickRanges(londonDayKey(new Date().toISOString())).find((x) => x.key === rangeKey) ?? null);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadJourney(r);
-    if (r) return;
-    const t = setInterval(() => loadJourney(null), 120_000); // today: keep it fresh
+    if (r && rangeKey !== "week") return;
+    const t = setInterval(() => loadJourney(r), 120_000); // today and this week: keep it fresh
     return () => clearInterval(t);
   }, [rangeKey, journeyTick, loadJourney]);
 
@@ -228,7 +228,7 @@ In my home area: movement inside it is never shown.` });
   if (error && !view) {
     return (
       <Container className="max-w-3xl space-y-4 py-10">
-        <h1 className="text-[32px] font-bold">My watch view</h1>
+        <h1 className="text-[32px] font-bold">Your watched places</h1>
         <Notice tone="red">{error}</Notice>
         <Button
           variant="secondary"
@@ -265,11 +265,8 @@ In my home area: movement inside it is never shown.` });
       {sample && (
         <div className="border-b-4 border-[#B45309] bg-[#FFE7A3] text-[#142B49]">
           <Container className="py-4">
-            <p className="text-lg font-bold sm:text-xl">This is a sample (dummy) watch account. Please don&apos;t make any changes.</p>
-            <p className="text-sm">
-              It shows exactly what a watcher sees: my real status, history and plans, coloured against this sample&apos;s areas.
-              Compare it with what everyone else sees on the public pages.
-            </p>
+            <p className="text-lg font-bold sm:text-xl">Sample watch view: read-only</p>
+            <p className="text-sm">What a watcher sees: my real status and history, in this sample&apos;s colours.</p>
           </Container>
         </div>
       )}
@@ -333,7 +330,7 @@ In my home area: movement inside it is never shown.` });
 
       <Container className="space-y-6 pb-20 pt-6 sm:pt-8">
         <div>
-          <h1 className="text-[28px] font-bold sm:text-[44px]">My watch view</h1>
+          <h1 className="text-[28px] font-bold sm:text-[44px]">{sample ? "Try a watcher's view" : "Your watched places"}</h1>
           {view?.is_sample && !sample && (
             <Notice tone="amber" title="This is the public sample watch link">
               You&apos;re setting it up. It isn&apos;t saved as your own watch link on this device. Lock it in Admin → Settings when
@@ -342,8 +339,7 @@ In my home area: movement inside it is never shown.` });
           )}
           {view?.display_code && (
             <p className="mt-1 text-sm text-muted">
-              You&apos;re <strong className="text-ink">Watcher #{view.display_code}</strong>: a random number so you can recognise
-              your view. It isn&apos;t linked to you.
+              <strong className="text-ink">Watcher #{view.display_code}</strong> (a random label, not linked to you)
             </p>
           )}
         </div>
@@ -389,7 +385,7 @@ In my home area: movement inside it is never shown.` });
               </MapFrame>
             </div>
             {journey && !journey.segments.length && !journey.stops.length && (
-              <p className="text-sm text-muted">No published journey for this period yet (the history is published every few minutes).</p>
+              <p className="text-sm text-muted">Nothing published for this period yet.</p>
             )}
             <InfoButton label="What the colours mean">
               <ul className="space-y-1.5">
@@ -428,9 +424,9 @@ In my home area: movement inside it is never shown.` });
                           <span className="block text-xs text-muted">
                             {TIER_META[a.tier].label} · {areaSummary(a)}
                           </span>
-                          {a.kind === "beyond_home" && <span className="block text-xs text-muted">Not drawn on the map: it would point to my home.</span>}
+                          {a.kind === "beyond_home" && <span className="block text-xs text-muted">Not drawn (it would point to my home).</span>}
                           {a.effective_from && <span className="block text-xs text-muted">In effect from {fmtDateTime(a.effective_from)}</span>}
-                          {a.tier === "location" && <span className="block text-xs text-muted">Locked to your link: only you can see it.</span>}
+                          {a.tier === "location" && <span className="block text-xs text-muted">Only you can see it.</span>}
                         </span>
                       </button>
                       <div className="mt-2 flex flex-wrap items-center gap-2 pl-[52px]">
@@ -475,10 +471,9 @@ In my home area: movement inside it is never shown.` });
               <h2 className="flex items-center gap-2 text-xl font-bold">
                 <Icon name="bell" className="text-accent" /> Notifications
               </h2>
-              <p className="text-sm text-muted">
-                Each device you turn notifications on for (the yellow bar at the top) gets an alert when I enter or leave your Wish and Want
-                areas.
-              </p>
+              <InfoButton label="How alerts work">
+                <p>Each device you turn notifications on for (the yellow bar at the top) gets an alert when I enter or leave your Wish and Want areas.</p>
+              </InfoButton>
               {view && (
                 <div className="space-y-2 border-t border-hairline pt-3 text-sm">
                   <p className="font-semibold">While I&apos;m still there, remind me</p>
@@ -530,9 +525,6 @@ In my home area: movement inside it is never shown.` });
 
             <Card className="space-y-3 p-4 sm:p-6">
               <h2 className="text-xl font-bold">Keep this on your phone</h2>
-              <p className="text-sm text-muted">
-                Install this page as an app: it opens straight into this view, so you won&apos;t need the link again on this device.
-              </p>
               <InstallAppButton label="Install my watch view" />
             </Card>
           </div>
@@ -585,7 +577,7 @@ In my home area: movement inside it is never shown.` });
 
         {visitsFor && <AreaVisits token={token} reference={visitsFor.reference} name={visitsFor.name} tier={visitsFor.tier} geojson={visitsFor.geojson ?? null} onClose={() => setVisitsFor(null)} />}
 
-        <p className="text-xs text-muted">Keep this page&apos;s link private. Your areas are expressions of concern, not legal restrictions.</p>
+        <p className="text-xs text-muted">Keep this link private. Areas are not legal restrictions.</p>
       </Container>
     </div>
   );

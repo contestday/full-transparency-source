@@ -19,20 +19,21 @@ export function SiteFooter() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[.08em] text-[#9FB4C9]">Explore</p>
           <ul className="mt-2 grid grid-cols-2 gap-x-4 text-sm md:grid-cols-1">
-            <li><Link className={link} href="/history">Public History</Link></li>
-            <li><Link className={link} href="/plans">Upcoming Plans</Link></li>
-            <li><Link className={link} href="/geofences/submit">Set Up Geofences</Link></li>
-            <li><Link className={link} href="/watch">Your Geofences</Link></li>
-            <li><Link className={link} href="/sample">Sample Geofence View (Live)</Link></li>
+            <li><Link className={link} href="/history">History</Link></li>
+            <li><Link className={link} href="/plans">Plans</Link></li>
+            <li><Link className={link} href="/geofences/submit">Watch</Link></li>
+            <li><Link className={link} href="/watch">Your places</Link></li>
+            <li><Link className={link} href="/sample">Sample</Link></li>
             <li><Link className={link} href="/admin">Owner sign-in</Link></li>
           </ul>
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-[.08em] text-[#9FB4C9]">Policy</p>
           <ul className="mt-2 grid grid-cols-2 gap-x-4 text-sm md:grid-cols-1">
-            <li><Link className={link} href="/privacy">Privacy &amp; anonymity</Link></li>
-            <li><Link className={link} href="/about">About &amp; publication policy</Link></li>
-            <li><Link className={link} href="/report">Contact</Link></li>
+            <li><Link className={link} href="/privacy">Privacy</Link></li>
+            <li><Link className={link} href="/privacy/policy">Privacy policy</Link></li>
+            <li><Link className={link} href="/about">FAQs</Link></li>
+            <li><Link className={link} href="/report">Message</Link></li>
           </ul>
         </div>
       </Container>

@@ -198,7 +198,7 @@ In my home area: movement inside it is never shown.` });
         </span>
         {watch ? (
           <Link href={`/watch/${watch.token}`} className="font-semibold text-accent hover:underline">
-            My watch view ({watch.areaCount} area{watch.areaCount === 1 ? "" : "s"}) →
+            Your places ({watch.areaCount}) →
           </Link>
         ) : (
           <Link href="/geofences/submit" className="font-semibold text-accent hover:underline">

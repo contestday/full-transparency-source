@@ -31,7 +31,7 @@ export function RangePicker({
           <input type="hidden" name="to" value={to} />
           <label className="min-w-0 flex-1 basis-56 text-sm">
             <span className="block font-semibold">Search a place</span>
-            <Input name="place" defaultValue={place} placeholder="A town, village, island or postcode, e.g. Sheffield" maxLength={100} className="bg-white" />
+            <Input name="place" defaultValue={place} placeholder="Town, village or postcode" maxLength={100} className="bg-white" />
           </label>
           <Button type="submit">Search</Button>
           {place && (

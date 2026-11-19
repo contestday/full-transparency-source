@@ -6,7 +6,7 @@ import { optionalEnv } from "@/lib/env";
 import { WatchView } from "../watch/[token]/watch-view";
 
 export const metadata: Metadata = {
-  title: "Sample Geofence View (Live)",
+  title: "Sample",
   description: "See what someone watching an area sees, compared with the public view.",
 };
 export const dynamic = "force-dynamic";

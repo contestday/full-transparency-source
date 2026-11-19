@@ -9,7 +9,7 @@ import { PlanCard, PlanFilters, PlansTabs, filterQuery, planPoint, str } from ".
 import { loadPublicZoneContext, publicZone } from "@/lib/zones";
 import { WatchZonesProvider } from "@/components/watch-zones";
 
-export const metadata: Metadata = { title: "Upcoming Plans" };
+export const metadata: Metadata = { title: "Plans" };
 export const dynamic = "force-dynamic";
 
 export default async function PlansSchedulePage({ searchParams }: PageProps<"/plans">) {
@@ -53,10 +53,9 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
   return (
     <>
       <PageHead
-        eyebrow="Upcoming plans"
         title="Where I'm going"
         art="plans"
-        lead="Things I've planned, entered by hand. Plans are intentions, not GPS records."
+        lead="What I plan to do. Plans are intentions, not GPS records."
       >
         <PlansTabs active="list" query={filterQuery(sp, ["category", "status"])} />
       </PageHead>

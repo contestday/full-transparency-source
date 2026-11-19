@@ -29,10 +29,9 @@ export default async function PlansMapPage({ searchParams }: PageProps<"/plans/m
   return (
     <>
       <PageHead
-        eyebrow="Upcoming plans"
-        title="Plans map"
+        title="Where I'm going"
         art="plans"
-        lead="Upcoming plans with a published location. Dashed squares mark a general area; pins are public venues."
+        lead="Pins are public venues; dashed squares are general areas."
       >
         <PlansTabs active="map" query={filterQuery(sp, ["category", "status"])} />
       </PageHead>

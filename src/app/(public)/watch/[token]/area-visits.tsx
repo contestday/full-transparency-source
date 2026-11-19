@@ -55,7 +55,7 @@ export function AreaVisits({
 }) {
   const now = useNow();
   const today = now ? londonDayKey(new Date(now).toISOString()) : null;
-  const [rangeKey, setRangeKey] = useState("all");
+  const [rangeKey, setRangeKey] = useState("week");
   const [data, setData] = useState<Visits | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 

@@ -4,7 +4,7 @@ import { Container, IconTile, PageHead } from "@/components/design";
 import { IncogneatoWidget } from "@/components/incogneato-widget";
 import { ReportForm } from "./report-form";
 
-export const metadata: Metadata = { title: "Contact" };
+export const metadata: Metadata = { title: "Message" };
 
 const INCOGNEATO_URL = process.env.NEXT_PUBLIC_INCOGNEATO_URL;
 const INCOGNEATO_BOX = process.env.NEXT_PUBLIC_INCOGNEATO_BOX;
@@ -14,7 +14,7 @@ const card = "rounded-[var(--ft-radius-card)] border border-border bg-surface p-
 export default function ContactPage() {
   return (
     <>
-      <PageHead eyebrow="Contact" title="Get in touch" lead="Questions, corrections, feedback or anything else. You don't need to give your name." />
+      <PageHead title="Message me" lead="Anything at all. No name needed." />
       <Container className="max-w-4xl space-y-6 pb-20 pt-8 text-[16px] leading-relaxed">
         <div className="grid gap-6">
           {INCOGNEATO_URL && (
@@ -50,7 +50,7 @@ export default function ContactPage() {
         <p className="text-muted">
           Want to keep an eye on a particular place? You don&apos;t need to message me: use{" "}
           <Link className="font-semibold text-accent underline" href="/geofences/submit">
-            Set Up Geofences
+            Watch
           </Link>
           . See{" "}
           <Link className="font-semibold text-accent underline" href="/privacy">

@@ -277,11 +277,13 @@ export function GeofenceSubmitForm({
                 className="max-w-32"
               />
             </Field>
-            <p className="text-sm text-muted">
-              We&apos;ve suggested a figure at random; type over it if you like. When you save, your circle&apos;s centre is moved this far in a random
-              direction, here in your browser, before anything is sent. The exact point you chose and this figure never leave your device, so nobody
-              else can see them, including me and the site.
-            </p>
+            <p className="text-sm text-muted">Only you see this figure. It never leaves your device.</p>
+            <InfoButton label="Why move the centre?">
+              <p>
+                A random suggestion; type over it if you like. When you save, the centre moves this far in a random direction, in your browser,
+                before anything is sent. Nobody else, including me and the site, ever sees the exact point or the figure.
+              </p>
+            </InfoButton>
           </div>
         )}
       </Card>

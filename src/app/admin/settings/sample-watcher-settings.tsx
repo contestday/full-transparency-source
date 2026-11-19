@@ -29,11 +29,11 @@ export function SampleWatcherSettings() {
   return (
     <Card className="space-y-3 p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Sample Geofence View (Live)</h2>
+        <h2 className="text-lg font-semibold">Sample</h2>
         {s?.exists && <Badge tone={s.locked ? "green" : "amber"}>{s.locked ? "Live at /sample (locked)" : "Being set up (not public yet)"}</Badge>}
       </div>
       <p className="text-sm text-muted">
-        A real watch link that anyone can open from the menu (&ldquo;Sample Geofence View (Live)&rdquo;), to see what a watcher sees compared
+        A real watch link that anyone can open from the menu (&ldquo;Sample&rdquo;), to see what a watcher sees compared
         with the public. Set up its areas first, then lock it: once locked, nothing on it can be added, changed or removed.
       </p>
       {error && <Notice tone="red">{error}</Notice>}
