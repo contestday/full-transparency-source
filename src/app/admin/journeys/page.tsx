@@ -3,8 +3,8 @@ import { requirePageRole } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fmtDateTime, fmtTime } from "@/lib/format";
-import { currentIpHash, loadIgnoredIps } from "@/lib/ignored-ips";
-import { IgnoredIps, IgnoreIpButton } from "../ignore-ip";
+import { currentIpHash, loadHiddenVisits, loadIgnoredIps } from "@/lib/ignored-ips";
+import { HideVisitButton, IgnoredIps, IgnoreIpButton, ShowHiddenVisits } from "../ignore-ip";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
   const sp = await searchParams;
   const days = RANGES.some((r) => r.key === sp.days) ? Number(sp.days) : 1;
   const since = new Date(new Date().getTime() - days * 86_400_000).toISOString();
-  const [{ data }, ignored, myHash] = await Promise.all([
+  const [{ data }, ignored, myHash, hiddenByHand] = await Promise.all([
     createServiceClient()
       .from("site_events")
       .select("visit_id, at, kind, path, detail, country, ip_hash, owner_device, automated")
@@ -46,12 +46,14 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
       .limit(20000),
     loadIgnoredIps(),
     currentIpHash(),
+    loadHiddenVisits(),
   ]);
+  const byHand = new Set(hiddenByHand);
   const skip = new Set(ignored.map((i) => i.hash));
   const all = (data ?? []) as Ev[];
   // Your own visits and automated checks are recorded, just hidden here.
   const autoVisits = new Set(all.filter((e) => e.automated).map((e) => e.visit_id));
-  const mineVisits = new Set(all.filter((e) => !autoVisits.has(e.visit_id) && (e.owner_device || (e.ip_hash && skip.has(e.ip_hash)))).map((e) => e.visit_id));
+  const mineVisits = new Set(all.filter((e) => !autoVisits.has(e.visit_id) && (byHand.has(e.visit_id) || e.owner_device || (e.ip_hash && skip.has(e.ip_hash)))).map((e) => e.visit_id));
   const hiddenVisits = new Set([...autoVisits, ...mineVisits]);
   const events = all.filter((e) => !hiddenVisits.has(e.visit_id));
 
@@ -80,7 +82,8 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
       {hiddenVisits.size > 0 && (
         <p className="text-xs text-muted">
           Hidden here (still recorded): {mineVisits.size} visit{mineVisits.size === 1 ? "" : "s"} of yours · {autoVisits.size} automated check
-          {autoVisits.size === 1 ? "" : "s"} (Vercel, test browsers, bots).
+          {autoVisits.size === 1 ? "" : "s"} (Vercel, test browsers, bots).{" "}
+          {byHand.size > 0 && <ShowHiddenVisits count={byHand.size} />}
         </p>
       )}
       <div className="flex flex-wrap gap-2 text-sm">
@@ -150,7 +153,12 @@ export default async function JourneysPage({ searchParams }: PageProps<"/admin/j
                       <span className="font-mono">IP …{h.slice(-8)}</span>
                       <IgnoreIpButton hash={h} label={`Visit ${fmtDateTime(v.start)}`} />
                     </div>
-                  ) : null;
+                  ) : (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                      <span>Recorded before IP fingerprints (19 Nov 2026).</span>
+                      <HideVisitButton visitId={v.id} />
+                    </div>
+                  );
                 })()}
                 <ol className="mt-2 space-y-1 border-l-2 border-hairline pl-3 text-xs">
                   {v.evs.map((e, i) => (

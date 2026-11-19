@@ -46,6 +46,47 @@ async function send(json: unknown) {
   await api("/api/admin/ignored-ips", { method: "POST", json });
 }
 
+/** For an older visit with no IP fingerprint: hide just that visit (still recorded). */
+export function HideVisitButton({ visitId }: { visitId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await send({ action: "hide_visit", visit_id: visitId });
+          router.refresh();
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      Hide this visit (mine)
+    </Button>
+  );
+}
+
+/** Bring back every visit hidden by hand. */
+export function ShowHiddenVisits({ count }: { count: number }) {
+  const router = useRouter();
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      onClick={async () => {
+        await send({ action: "show_visits" });
+        router.refresh();
+      }}
+    >
+      Show the {count} hidden by hand again
+    </Button>
+  );
+}
+
 /** "Ignore this IP" for one visit or sender. */
 export function IgnoreIpButton({ hash, label }: { hash: string; label: string }) {
   const router = useRouter();

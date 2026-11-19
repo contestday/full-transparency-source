@@ -16,16 +16,46 @@ export interface IgnoredIp {
 
 const KEY = "ignored_ips";
 
-export async function loadIgnoredIps(): Promise<IgnoredIp[]> {
-  const { data } = await createServiceClient().from("system_state").select("value").eq("key", KEY).maybeSingle();
-  const list = (data?.value as { list?: IgnoredIp[] } | null)?.list;
-  return Array.isArray(list) ? list.filter((i) => typeof i?.hash === "string") : [];
+interface Stored {
+  list: IgnoredIp[];
+  /** Single visits hidden by hand (older visits recorded before fingerprints, 19 Nov 2026). */
+  visits: string[];
 }
 
-async function save(list: IgnoredIp[]) {
-  await createServiceClient()
+async function load(): Promise<Stored> {
+  const { data } = await createServiceClient().from("system_state").select("value").eq("key", KEY).maybeSingle();
+  const v = (data?.value ?? {}) as Partial<Stored>;
+  return {
+    list: Array.isArray(v.list) ? v.list.filter((i) => typeof i?.hash === "string") : [],
+    visits: Array.isArray(v.visits) ? v.visits.filter((x) => typeof x === "string") : [],
+  };
+}
+
+export async function loadIgnoredIps(): Promise<IgnoredIp[]> {
+  return (await load()).list;
+}
+
+export async function loadHiddenVisits(): Promise<string[]> {
+  return (await load()).visits;
+}
+
+async function store(next: Partial<Stored>) {
+  const value = { ...(await load()), ...next };
+  const { error } = await createServiceClient()
     .from("system_state")
-    .upsert({ key: KEY, value: { list }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    .upsert({ key: KEY, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) throw error;
+}
+
+const save = (list: IgnoredIp[]) => store({ list });
+
+export async function hideVisit(visitId: string) {
+  const { visits } = await load();
+  if (!visits.includes(visitId)) await store({ visits: [...visits, visitId].slice(-2000) });
+}
+
+export async function showHiddenVisits() {
+  await store({ visits: [] });
 }
 
 export async function ignoreIp(hash: string, label: string) {

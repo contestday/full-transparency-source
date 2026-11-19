@@ -2,7 +2,7 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { handle, json, parseJson } from "@/lib/http";
 import { clientHash } from "@/lib/rate-limit";
-import { ignoreIp, unignoreIp } from "@/lib/ignored-ips";
+import { hideVisit, ignoreIp, showHiddenVisits, unignoreIp } from "@/lib/ignored-ips";
 import { auditStaff } from "@/lib/audit";
 
 export const runtime = "nodejs";
@@ -13,6 +13,8 @@ const body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("ignore_me") }),
   z.object({ action: z.literal("ignore"), hash, label: z.string().trim().max(60).optional() }),
   z.object({ action: z.literal("unignore"), hash }),
+  z.object({ action: z.literal("hide_visit"), visit_id: z.string().regex(/^[A-Za-z0-9]{8,40}$/) }),
+  z.object({ action: z.literal("show_visits") }),
 ]);
 
 /** Leave an IP fingerprint out of Journeys and Senders (or bring it back). Admin only. */
@@ -23,7 +25,9 @@ export const POST = handle(async (request: Request) => {
     const when = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/London" });
     await ignoreIp(await clientHash(request), `My IP (added ${when})`);
   } else if (input.action === "ignore") await ignoreIp(input.hash, input.label || "Ignored IP");
-  else await unignoreIp(input.hash);
+  else if (input.action === "unignore") await unignoreIp(input.hash);
+  else if (input.action === "hide_visit") await hideVisit(input.visit_id);
+  else await showHiddenVisits();
   await auditStaff(supabase, user.id, { action: `ignored_ips.${input.action}`, resourceType: "ip_fingerprint" });
   return json({ ok: true });
 });
