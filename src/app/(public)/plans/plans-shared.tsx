@@ -1,12 +1,13 @@
 import { Badge, Button, Select } from "@/components/ui";
 import { Icon, Segmented, type IconName } from "@/components/design";
-import { PLAN_CATEGORIES, PLAN_STATUSES, STATUS_LABELS, categoryLabel, type PlanStatus } from "@/lib/plans";
+import { PLAN_CATEGORIES, PLAN_STATUSES, PRIVATE_LOCATION_LABEL, STATUS_LABELS, categoryLabel, type PlanStatus } from "@/lib/plans";
 import { fmtDate, fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
 import type { PublicPlan } from "@/lib/public-data";
 import { needsOutcome } from "@/lib/plan-outcome";
 import { ZoneCard } from "@/components/zone-card";
 import type { BaseZone } from "@/lib/geofence/tiers";
 import { PlanMapButton } from "./plan-map-button";
+import { WishButtons } from "./wish-buttons";
 
 /** Past plan with no outcome yet (rendered per request, so "now" is the request time). */
 function awaitingOutcome(p: PublicPlan): boolean {
@@ -103,6 +104,7 @@ export function planWhen(p: PublicPlan): string {
 }
 
 export function planWhere(p: PublicPlan): string {
+  if (p.private_location) return PRIVATE_LOCATION_LABEL;
   if (p.venue_name) {
     // Avoid "The Crown, The Crown, Riverside" when the area label repeats the name.
     let area = p.public_area_label?.trim() ?? "";
@@ -170,7 +172,7 @@ export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | 
             {p.extra_locations.map((l) => (
               <li key={l.position} className="flex items-center gap-1.5">
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky text-[11px] font-bold text-ink">{l.position + 1}</span>
-                {l.venue_name ?? (l.area_label ? `${l.area_label} (general area)` : "Location not published")}
+                {l.private_location ? PRIVATE_LOCATION_LABEL : (l.venue_name ?? (l.area_label ? `${l.area_label} (general area)` : "Location not published"))}
               </li>
             ))}
           </ol>
@@ -203,6 +205,10 @@ export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | 
           <p className="mt-2 rounded-lg bg-[#F1F4F8] px-3 py-2 text-sm text-muted">This plan&apos;s time has passed. Its outcome is awaiting confirmation.</p>
         )}
         {p.publication_mode === "retrospective" && <p className="mt-2 text-xs text-muted">Published after the event.</p>}
+        {p.private_location && (
+          <p className="mt-2 text-xs text-muted">The place is kept private to protect the people there, not to hide the visit.</p>
+        )}
+        {!cancelled && p.status !== "completed" && <WishButtons planId={p.id} />}
       </div>
      </div>
     </ZoneCard>

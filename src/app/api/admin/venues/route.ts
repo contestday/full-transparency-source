@@ -19,6 +19,8 @@ const venueSchema = z
     lng: z.number().min(-180).max(180).nullable().optional(),
     public_area_label: z.string().trim().max(120).nullable().optional(),
     is_public: z.boolean().default(false),
+    /** Private location: its name and position are never shown publicly. */
+    is_hidden: z.boolean().default(false),
   })
   .refine((v) => (v.lat == null) === (v.lng == null), { message: "Latitude and longitude must be provided together" });
 
@@ -42,7 +44,8 @@ export const POST = handle(async (request: Request) => {
     lat: input.lat ?? null,
     lng: input.lng ?? null,
     public_area_label: input.public_area_label ?? null,
-    is_public: input.is_public,
+    is_public: input.is_public && !input.is_hidden,
+    is_hidden: input.is_hidden,
     updated_at: new Date().toISOString(),
   };
   const { data, error } = input.id
@@ -58,7 +61,7 @@ export const POST = handle(async (request: Request) => {
       if (!parsed.success) continue;
       let data = parsed.data;
       // A venue switched to private must not stay published at venue precision.
-      if (!input.is_public && (data.publication_mode === "exact_venue" || data.publication_mode === "retrospective")) {
+      if ((!input.is_public || input.is_hidden) && (data.publication_mode === "exact_venue" || data.publication_mode === "retrospective")) {
         data = { ...data, publication_mode: "general_area" };
       }
       const planRow = await buildPlanRow(supabase, data, p);

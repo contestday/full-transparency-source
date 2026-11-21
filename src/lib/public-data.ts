@@ -46,6 +46,8 @@ export interface PublicPlan {
   actual_ended_at?: string | null;
   /** Further locations, already filtered by the venue privacy rule. */
   extra_locations: PublicPlanLocation[];
+  /** At a private location: shown only as "Private location" (migration 0025). */
+  private_location?: boolean;
 }
 
 export interface PublicPlanLocation {
@@ -55,6 +57,7 @@ export interface PublicPlanLocation {
   public_lat: number | null;
   public_lng: number | null;
   public_cell_size_m: number | null;
+  private_location?: boolean;
 }
 
 /** Upper bound on rows per history request (~3 weeks of 3-minute samples). */
@@ -108,11 +111,8 @@ export async function getPublicPlans(opts: { from?: string; to?: string; categor
   if (error) throw error;
   const plans = (data ?? []) as Omit<PublicPlan, "extra_locations">[];
   if (!plans.length) return [];
-  const { data: locs, error: locErr } = await createServiceClient()
-    .from("public_plan_locations")
-    .select("*")
-    .in("plan_id", plans.map((p) => p.id))
-    .order("position");
+  const ids = plans.map((p) => p.id);
+  const { data: locs, error: locErr } = await createServiceClient().from("public_plan_locations").select("*").in("plan_id", ids).order("position");
   // Extra locations are optional: never fail the whole board because of them.
   if (locErr) console.error("public_plan_locations unavailable", locErr.message);
   const byPlan = new Map<string, PublicPlanLocation[]>();

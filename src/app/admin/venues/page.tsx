@@ -6,7 +6,7 @@ import { SuggestedVenues, type SuggestedVenue } from "./suggested-venues";
 export default async function AdminVenuesPage() {
   const { supabase } = await requirePageRole(["admin"]);
   const [{ data }, { data: suggested }] = await Promise.all([
-    supabase.from("venues").select("id, name, category, address, lat, lng, public_area_label, is_public").order("name").limit(1000),
+    supabase.from("venues").select("id, name, category, address, lat, lng, public_area_label, is_public, is_hidden").order("name").limit(1000),
     supabase
       .from("venues")
       .select("id, name, category, address, public_area_label, metadata")

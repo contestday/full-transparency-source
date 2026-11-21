@@ -16,9 +16,11 @@ export interface Venue {
   lng: number | null;
   public_area_label: string | null;
   is_public: boolean;
+  /** Private location: shown to others only as "Private location". */
+  is_hidden?: boolean;
 }
 
-const blank = { name: "", category: "restaurant", address: "", lat: null as number | null, lng: null as number | null, public_area_label: "", is_public: false };
+const blank = { name: "", category: "restaurant", address: "", lat: null as number | null, lng: null as number | null, public_area_label: "", is_public: false, is_hidden: false };
 
 export function VenuesManager({ initial }: { initial: Venue[] }) {
   const [venues, setVenues] = useState(initial);
@@ -90,7 +92,19 @@ export function VenuesManager({ initial }: { initial: Venue[] }) {
             </Select>
           </Field>
           <label className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
-            <input type="checkbox" className="mt-0.5 h-5 w-5" checked={form.is_public} onChange={(e) => setForm({ ...form, is_public: e.target.checked })} />
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5"
+              checked={form.is_hidden}
+              onChange={(e) => setForm({ ...form, is_hidden: e.target.checked, is_public: e.target.checked ? false : form.is_public })}
+            />
+            <span>
+              <strong>Private location</strong>: others see only &quot;Private location&quot;, with no name, area or map position. You still see it.
+              <span className="block text-xs text-muted">For the safety of the people there, not to hide the visit.</span>
+            </span>
+          </label>
+          <label className={`flex items-start gap-2 rounded-md border border-border p-3 text-sm ${form.is_hidden ? "opacity-50" : ""}`}>
+            <input type="checkbox" className="mt-0.5 h-5 w-5" disabled={form.is_hidden} checked={form.is_public} onChange={(e) => setForm({ ...form, is_public: e.target.checked })} />
             <span>
               <strong>Public venue</strong> (pub, hotel, restaurant, shop…): name and exact location are shown publicly.
               <span className="block text-xs text-muted">Leave unticked for private addresses. Only the area label below is shown.</span>
@@ -147,7 +161,7 @@ export function VenuesManager({ initial }: { initial: Venue[] }) {
               <div>
                 <p className="font-medium">{v.name}</p>
                 <p className="text-xs text-muted">
-                  {v.is_public ? "Public venue" : "Private address"} · {categoryLabel(v.category)}
+                  {v.is_hidden ? "Private location (hidden from others)" : v.is_public ? "Public venue" : "Private address"} · {categoryLabel(v.category)}
                   {v.public_area_label ? ` · ${v.public_area_label}` : ""}
                   {v.lat == null ? " · no location" : ""}
                 </p>
@@ -156,7 +170,7 @@ export function VenuesManager({ initial }: { initial: Venue[] }) {
                 size="sm"
                 variant="secondary"
                 onClick={() =>
-                  setForm({ id: v.id, name: v.name, category: v.category, address: v.address ?? "", lat: v.lat, lng: v.lng, public_area_label: v.public_area_label ?? "", is_public: v.is_public })
+                  setForm({ id: v.id, name: v.name, category: v.category, address: v.address ?? "", lat: v.lat, lng: v.lng, public_area_label: v.public_area_label ?? "", is_public: v.is_public, is_hidden: Boolean(v.is_hidden) })
                 }
               >
                 Edit

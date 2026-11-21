@@ -37,6 +37,7 @@ export interface VenueOption {
   lat: number | null;
   lng: number | null;
   is_public: boolean;
+  is_hidden?: boolean;
 }
 
 type Draft = {
@@ -336,7 +337,7 @@ export function PlansEditor({
                     {ven && !venueMatches.includes(ven) && <option value={ven.id}>{ven.name}</option>}
                     {venueMatches.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name} · {v.is_public ? "public" : "private"} · {categoryLabel(v.category)}
+                        {v.name} · {v.is_hidden ? "private location" : v.is_public ? "public" : "private"} · {categoryLabel(v.category)}
                       </option>
                     ))}
                   </Select>
@@ -350,7 +351,7 @@ export function PlansEditor({
             })}
             {selectedVenue && (
               <p className="text-xs text-muted">
-                Main: {selectedVenue.name} ({selectedVenue.is_public ? "public venue, shown in full" : "private address, area only"})
+                Main: {selectedVenue.name} ({selectedVenue.is_hidden ? "private location: others see only \"Private location\"" : selectedVenue.is_public ? "public venue, shown in full" : "private address, area only"})
               </p>
             )}
             <div className="flex flex-wrap gap-2">

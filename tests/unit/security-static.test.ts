@@ -25,6 +25,7 @@ const PRIVATE_TABLES = [
   "published_locations",
   "planned_activities",
   "venues",
+  "plan_wishes",
   "geofences",
   "geofence_events",
   "geofence_state",

@@ -8,7 +8,7 @@ async function resolveLocation(supabase: SupabaseClient, input: Pick<PlanInput, 
   if (input.venue_id) {
     const { data: venue, error } = await supabase
       .from("venues")
-      .select("lat, lng, public_area_label, is_public")
+      .select("lat, lng, public_area_label, is_public, is_hidden")
       .eq("id", input.venue_id)
       .maybeSingle();
     if (error) throw error;
@@ -35,7 +35,9 @@ export async function buildPlanRow(supabase: SupabaseClient, input: PlanInput, e
     input.confirm_private_exact,
   );
   if (privacyError) throw new HttpError(422, privacyError);
-  const pub = publicLocationFor(input.publication_mode, location);
+  // A private location is never placed or named publicly, whatever the mode.
+  const hidden = Boolean(venue?.is_hidden);
+  const pub = publicLocationFor(hidden ? "private" : input.publication_mode, location);
   const published = isPublished(input.status, input.publication_mode);
   return {
     title: input.title,
@@ -49,7 +51,7 @@ export async function buildPlanRow(supabase: SupabaseClient, input: PlanInput, e
     lng: input.lng ?? null,
     status: input.status,
     publication_mode: input.publication_mode,
-    public_area_label: input.public_area_label || venueAreaLabel || null,
+    public_area_label: hidden ? null : input.public_area_label || venueAreaLabel || null,
     ...pub,
     published_at: published ? (existing?.published_at ?? new Date().toISOString()) : null,
     updated_at: new Date().toISOString(),
@@ -76,7 +78,7 @@ export async function syncPlanLocations(
   if (!ids.length) return;
   const { data: venues, error } = await supabase
     .from("venues")
-    .select("id, name, is_public, lat, lng, public_area_label")
+    .select("id, name, is_public, lat, lng, public_area_label, is_hidden")
     .in("id", ids);
   if (error) throw error;
   const byId = new Map((venues ?? []).map((v) => [v.id as string, v]));

@@ -16,6 +16,7 @@ export type NotificationEvent =
   | "publication_failure"
   | "live_status_changed"
   | "plan_outcome_needed"
+  | "plan_wish"
   | "test";
 
 export interface NotificationMessage {

@@ -192,7 +192,12 @@ export interface StopVenue {
   lat: number | null;
   lng: number | null;
   public_area_label: string | null;
+  /** Private location: never named or placed publicly (protects the people there). */
+  is_hidden?: boolean;
 }
+
+/** Shown to the public in place of a private venue's name. */
+export const PRIVATE_LOCATION_LABEL = "Private location";
 
 /**
  * Public fields for one additional plan location, following the venue rule:
@@ -200,6 +205,7 @@ export interface StopVenue {
  * area only, whatever the plan's mode.
  */
 export function publicStopFor(mode: PublicationMode, venue: StopVenue) {
+  if (venue.is_hidden) return { public_venue_name: null, public_area_label: null, ...publicLocationFor("private", null) };
   const loc = venue.lat != null && venue.lng != null ? { lat: venue.lat, lng: venue.lng } : null;
   const showVenue = (mode === "exact_venue" || mode === "retrospective") && venue.is_public;
   const pos = publicLocationFor(showVenue ? "exact_venue" : mode === "private" ? "private" : "general_area", loc);

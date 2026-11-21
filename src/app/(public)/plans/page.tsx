@@ -11,6 +11,7 @@ import { InfoButton } from "@/components/info-button";
 import { shiftDay } from "@/lib/history-range";
 import { loadPublicZoneContext, publicZone } from "@/lib/zones";
 import { WatchZonesProvider } from "@/components/watch-zones";
+import { WISHES_NOTE } from "@/lib/plan-wishes";
 
 export const metadata: Metadata = { title: "Plans" };
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
         <PlansTabs active="list" query={filterQuery(sp, ["category", "status"])} />
       </PageHead>
       <Container className="space-y-5 pb-20 pt-6">
+        <p className="rounded-lg border border-hairline bg-white px-4 py-3 text-sm text-muted">{WISHES_NOTE}</p>
         {!showPast && !failed && (() => {
           // The next 7 days with a dot for each plan, then the next plan in full.
           const week = [0, 1, 2, 3, 4, 5, 6].map((i) => shiftDay(todayKey, i));
