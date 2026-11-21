@@ -51,6 +51,8 @@ export async function pollFollowMee(): Promise<PollSummary> {
     const { observations, rejected } = await fetchFollowMeeHistory(cfg, hours);
     const { inserted, duplicates } = await insertObservations(supabase, "followmee", batch.id, observations);
     const geofenceEvents = await evaluateGeofences(inserted);
+    // Events: runs even with no new rows, so an event starting or ending is noticed.
+    await import("@/lib/events/server").then((m) => m.evaluateEvents(inserted)).catch((err) => console.error("event check failed", err));
     // Always runs (even with no new rows) so the marker turns grey when stale.
     const liveStatus = await updateLiveStatus(inserted);
     // "Still there" reminders for watchers' Want areas and Locations.

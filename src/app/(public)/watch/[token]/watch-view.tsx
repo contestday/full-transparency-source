@@ -18,6 +18,10 @@ import { GeofenceSubmitForm, type EditableArea } from "../../geofences/submit/su
 import type { DrawnShape } from "@/components/geofence-drawer";
 import { LIVE_STATUS_META, WATCH_LABELS } from "@/lib/live-status";
 import { fmtSqMiles, TIER_META, ZONE_COLOR, ZONE_LABEL, type Tier, type WideMode, type Zone } from "@/lib/geofence/tiers";
+import { eventFeatures, type EventView } from "@/components/event-card";
+import { EVENT_COLOR, homeAssurance } from "@/lib/events/rules";
+import { YourEvents } from "@/app/(public)/events/your-events";
+import { EventForm } from "@/app/(public)/events/event-form";
 import { gridCellRing } from "@/lib/geo";
 import { fmtDateTime, fmtTime, londonDayKey, relativeAge } from "@/lib/format";
 import { formatDistance } from "@/components/address-search";
@@ -44,6 +48,7 @@ interface Area {
   sealed: boolean;
   submitted_at: string;
   effective_from?: string;
+  includes_home?: boolean;
 }
 
 interface View {
@@ -125,6 +130,9 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [events, setEvents] = useState<EventView[]>([]);
+  const [eventsKey, setEventsKey] = useState(0);
+  const [addingEvent, setAddingEvent] = useState(false);
   const [focus, setFocus] = useState<{ key: number; features: MapFeature[] } | null>(null);
   const [copied, setCopied] = useState(false);
   // Which period's journey: Today, Yesterday, This week, This month, This year or All time.
@@ -223,6 +231,7 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
     const f: MapFeature[] = homeAreaFeatures(view.home_area, { here, color: meta.color, hereLabel: `${meta.label}
 In my home area: movement inside it is never shown.` });
     f.push(...view.areas.flatMap((a, i) => areaFeature(a, i, a.reference === selected) ?? []));
+    f.push(...eventFeatures(events));
     for (const s of journey?.segments ?? []) {
       f.push({ type: "Feature", geometry: { type: "LineString", coordinates: s.coords }, properties: { color: ZONE_COLOR[s.zone] } });
     }
@@ -239,7 +248,7 @@ In my home area: movement inside it is never shown.` });
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 11, label: `${meta.label}\nApproximate area` } });
     }
     return f;
-  }, [view, meta, journey, selected, rangeKey, areaFeature]);
+  }, [view, meta, journey, selected, rangeKey, areaFeature, events]);
 
   /** Tap an area: highlight it and zoom the map to it. */
   function showArea(a: Area, i: number) {
@@ -446,11 +455,38 @@ In my home area: movement inside it is never shown.` });
                   </li>
                 ))}
               </ul>
-              <p className="text-muted">The status, the route and the stops all use these colours. Only you see purple, red and amber.</p>
+              <p className="flex items-center gap-2">
+                <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: EVENT_COLOR }} aria-hidden="true" />
+                At one of your events, while it&apos;s on
+              </p>
+              <p className="text-muted">The status, the route and the stops all use these colours. Only you see black, purple, red and amber.</p>
             </InfoButton>
           </section>
 
           <div className="min-w-0 grow-[5] basis-[340px] space-y-6">
+            {!sample && (
+              <Card className="space-y-3 p-4 sm:p-6">
+                <YourEvents token={token} refreshKey={eventsKey} title="My events" hideMap onEvents={setEvents} />
+                {!events.length && (
+                  <>
+                    <h2 className="text-xl font-bold">My events</h2>
+                    <p className="text-sm text-muted">Somewhere you&apos;d rather I wasn&apos;t, for that time only: a concert, a few days in a town. Shown in black.</p>
+                  </>
+                )}
+                {addingEvent ? (
+                  <EventForm
+                    watchToken={token}
+                    onAdded={() => {
+                      setEventsKey((k) => k + 1);
+                    }}
+                  />
+                ) : (
+                  <Button variant="secondary" onClick={() => setAddingEvent(true)}>
+                    Add an event
+                  </Button>
+                )}
+              </Card>
+            )}
             <Card className="space-y-3 p-4 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">My areas</h2>
@@ -497,6 +533,11 @@ In my home area: movement inside it is never shown.` });
                         </p>
                       )}
                       {a.kind === "beyond_home" && <p className="text-xs text-muted">Not drawn (it would point to my home).</p>}
+                      {a.includes_home && (
+                        <p className="rounded-lg border border-border bg-slate-50 p-2 text-xs">
+                          <strong>Includes home.</strong> {homeAssurance(view?.owner_first ?? "I")}
+                        </p>
+                      )}
                       <div className="flex flex-wrap items-center gap-2">
                         <button
                           type="button"

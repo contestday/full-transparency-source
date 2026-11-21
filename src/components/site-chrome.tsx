@@ -22,6 +22,7 @@ export function SiteFooter() {
             <li><Link className={link} href="/history">History</Link></li>
             <li><Link className={link} href="/plans">Plans</Link></li>
             <li><Link className={link} href="/geofences/submit">Watch</Link></li>
+            <li><Link className={link} href="/events">Events</Link></li>
             <li><Link className={link} href="/watch">Your places</Link></li>
             <li><Link className={link} href="/sample">Sample</Link></li>
             <li><Link className={link} href="/admin">Owner sign-in</Link></li>

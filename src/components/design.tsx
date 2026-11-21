@@ -279,6 +279,7 @@ const STATUS_ICON: Record<StatusKey, IconName> = {
   amber: "layers",
   red: "target",
   purple: "rings",
+  black: "calendar",
   unknown: "dash",
   disabled: "dash",
 };
@@ -374,6 +375,7 @@ export const STATUS_TONE: Record<StatusKey | "blue", { bg: string; ink: string; 
   amber: { bg: "var(--amber-bg)", ink: "var(--amber-ink)", dot: "#F08C00", short: "Wish area" },
   red: { bg: "var(--red-bg)", ink: "var(--red-ink)", dot: "#C62828", short: "Noted area" },
   purple: { bg: "var(--purple-bg)", ink: "var(--purple-ink)", dot: "#7E22CE", short: "Location" },
+  black: { bg: "#E7E7E7", ink: "#111111", dot: "#111111", short: "Event" },
   unknown: { bg: "var(--grey-bg)", ink: "var(--grey-ink)", dot: "#64748B", short: "No GPS" },
   disabled: { bg: "var(--grey-bg)", ink: "var(--grey-ink)", dot: "#64748B", short: "Off" },
   blue: { bg: "var(--ice)", ink: "#1947B5", dot: "#245AD6", short: "" },

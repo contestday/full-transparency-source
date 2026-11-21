@@ -41,6 +41,7 @@ const GROUPS: Record<MapFence["group"], { label: string; color: string }> = {
   wish: { label: "Wish (amber)", color: "#F08C00" },
   want: { label: "Want (red)", color: "#C62828" },
   location: { label: "Sample Location (purple)", color: "#7E22CE" },
+  event: { label: "Events (black)", color: "#111111" },
 };
 const NEAR_M = 1500;
 interface PlanPoint {
@@ -91,7 +92,7 @@ export function LocationExplorer({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [layers, setLayers] = useState({ route: true, points: mode === "history", visits: true, plans: true });
-  const [groups, setGroups] = useState<Record<MapFence["group"], boolean>>({ mine: true, wish: true, want: true, location: true });
+  const [groups, setGroups] = useState<Record<MapFence["group"], boolean>>({ mine: true, wish: true, want: true, location: true, event: true });
 
   const query = useMemo(() => {
     const p = new URLSearchParams({ from: new Date(from).toISOString(), to: new Date(to).toISOString() });
@@ -141,7 +142,7 @@ export function LocationExplorer({
           color: GROUPS[g.group].color,
           // Watchers' areas have solid outlines; my own noted areas are dashed.
           // "Rather I didn't leave" Wish areas: outline only (the amber part is outside them).
-          dashed: g.group === "mine",
+          dashed: g.group === "mine" || (g.group === "event" && g.name.endsWith("(upcoming)")),
           opacity: g.outside ? 0 : 0.14,
           label: `${GROUPS[g.group].label}${g.sample ? " · sample" : ""}${g.outside ? " · rather I didn't leave" : ""}\n${g.reference}${g.name ? `\n${g.name.slice(0, 120)}` : ""}`,
         },
@@ -377,7 +378,7 @@ Latest: ${fmtDateTime(latest.observed_at)}\n${latest.source}${latest.accuracy_m 
   );
 }
 
-const ORDER: Record<MapFence["group"], number> = { location: 0, want: 1, wish: 2, mine: 3 };
+const ORDER: Record<MapFence["group"], number> = { event: 0, location: 1, want: 2, wish: 3, mine: 4 };
 const order = (g: MapFence) => ORDER[g.group];
 
 function AreaChip({ g, extra }: { g: MapFence; extra?: string }) {

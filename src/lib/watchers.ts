@@ -9,7 +9,8 @@ import { zoneAt, type Tier, type WideMode } from "@/lib/geofence/tiers";
 import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 import { liveHoldMs, optionalEnv } from "@/lib/env";
 import { alertText, type AlertEvent } from "@/lib/alert-text";
-import { loadHomeArea, type HomeArea } from "@/lib/home";
+import { loadHome, loadHomeArea, type HomeArea } from "@/lib/home";
+import { pointInArea } from "@/lib/geofence/area-geometry";
 
 
 export interface Watcher {
@@ -88,6 +89,8 @@ export interface WatcherArea {
   submitted_at: string;
   /** When it came into effect (never before 18 Nov 2026 20:00 GMT). */
   effective_from: string;
+  /** It includes my home: I'm never expected to leave home for it. */
+  includes_home?: boolean;
 }
 
 export interface WatcherView {
@@ -166,7 +169,11 @@ export async function watcherView(watcherId: string, token: string): Promise<Wat
   await supabase.from("watchers").update(update).eq("id", watcherId);
   const sealedAlerts = Boolean(me?.alert_key);
 
-  const publicAreas = areas.map(toWatcherArea);
+  const home = await loadHome().catch(() => null);
+  const publicAreas = areas.map((a) => ({
+    ...toWatcherArea(a),
+    includes_home: Boolean(home && a.kind !== "beyond_home" && a.geometry && pointInArea(home, a.geometry)),
+  }));
   if (!enabled) {
     return { display_code: displayCode, moving: false, enabled, status: "disabled", label: LIVE_STATUS_META.disabled.label, public_lat: null, public_lng: null, cell_size_m: null, observed_at: null, sealed_alerts: sealedAlerts, is_sample: isSample, reminder_minutes: Number(me?.reminder_minutes ?? 30), reminder_location_minutes: Number(me?.reminder_location_minutes ?? 30), owner_name: owner.name, owner_first: owner.first, areas: publicAreas, home_area: homeArea };
   }
@@ -174,13 +181,16 @@ export async function watcherView(watcherId: string, token: string): Promise<Wat
   let areaZone: "purple" | "red" | "amber" | null = null;
   if (!stale && areas.length) {
     const p = await latestReading();
-    if (p) {
+    const { loadAtHomeZone, isAtHome } = await import("@/lib/events/server");
+    // At home never counts for anyone's area.
+    if (p && !isAtHome(p, await loadAtHomeZone().catch(() => null))) {
       const z = zoneAt(p, null, zoneAreas(areas));
       areaZone = z === "purple" || z === "red" || z === "amber" ? z : null;
     }
   }
   const homeStatus = ((live?.public_status as LiveStatus | undefined) ?? "unknown") as LiveStatus;
-  const status = computeWatcherStatus({ stale, homeStatus, areaZone });
+  const atEvent = !stale && (await import("@/lib/events/server").then((m) => m.insideWatcherEvent(watcherId)).catch(() => false));
+  const status = computeWatcherStatus({ stale, homeStatus, areaZone, atEvent });
   return {
     display_code: displayCode,
     moving: !stale && Boolean(live?.moving),
@@ -221,7 +231,7 @@ export async function loadOwnerProfile(): Promise<{ name: string; first: string 
 }
 
 /** Push one message to every active device of a watch link. */
-async function pushToWatcher(watcherId: string, payload: string) {
+export async function pushToWatcher(watcherId: string, payload: string) {
   if (!vapidReady()) return;
   const supabase = createServiceClient();
   const { data: subs } = await supabase

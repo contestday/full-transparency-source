@@ -208,8 +208,9 @@ export function shiftedHome(home: LatLng, distanceM: number, u1: number, u2: num
 /* -------------------------------------------------------- route colours */
 
 /** Route/zone colours, strongest first. */
-export type Zone = "purple" | "red" | "amber" | "yellow" | "green";
+export type Zone = "black" | "purple" | "red" | "amber" | "yellow" | "green";
 export const ZONE_COLOR: Record<Zone, string> = {
+  black: "#111111",
   purple: TIER_META.location.color,
   red: TIER_META.local.color,
   amber: TIER_META.wide.color,
@@ -217,6 +218,7 @@ export const ZONE_COLOR: Record<Zone, string> = {
   green: "#007B60",
 };
 export const ZONE_LABEL: Record<Zone, string> = {
+  black: "At one of your events, while it's on",
   purple: "At one of your locations",
   red: "In one of your Want areas, or one of my noted areas",
   amber: "In one of your Wish areas",

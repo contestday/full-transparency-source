@@ -11,7 +11,7 @@ export function randomCode(length: number): string {
 }
 
 /** Human-friendly reference, e.g. FT-R-7KQ2-M9XD */
-export function makeReference(prefix: "R" | "G"): string {
+export function makeReference(prefix: "R" | "G" | "E"): string {
   const code = randomCode(8);
   return `FT-${prefix}-${code.slice(0, 4)}-${code.slice(4)}`;
 }

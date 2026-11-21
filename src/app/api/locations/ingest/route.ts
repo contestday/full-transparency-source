@@ -69,6 +69,8 @@ export const POST = handle(async (request: Request) => {
 
   const { inserted, duplicates } = await insertObservations(supabase, "ingest_api", batch.id, rows);
   const geofenceEvents = await evaluateGeofences(inserted);
+  // Events (watchers' time-limited places).
+  await import("@/lib/events/server").then((m) => m.evaluateEvents(inserted)).catch((err) => console.error("event check failed", err));
   const liveStatus = await updateLiveStatus(inserted);
   await supabase
     .from("location_import_batches")

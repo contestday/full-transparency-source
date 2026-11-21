@@ -57,6 +57,7 @@ const badgeTones = {
   amber: "bg-amber-50 text-amber-900 border-amber-300",
   red: "bg-red-50 text-red-800 border-red-200",
   purple: "bg-purple-50 text-purple-800 border-purple-200",
+  black: "bg-neutral-900 text-white border-neutral-900",
 } as const;
 
 export function Badge({

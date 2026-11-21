@@ -15,6 +15,7 @@ const ADMIN_NAV = [
   { href: "/admin/map", label: "Map" },
   { href: "/admin/history", label: "History" },
   { href: "/admin/geofences", label: "Geofences" },
+  { href: "/admin/events", label: "Events" },
   { href: "/admin/area-record", label: "Area record" },
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/journeys", label: "Journeys" },

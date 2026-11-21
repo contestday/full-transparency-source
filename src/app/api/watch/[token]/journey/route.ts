@@ -6,6 +6,9 @@ import { loadOkayZone } from "@/lib/home";
 import { getPublicHistory } from "@/lib/public-data";
 import { colouredRouteSegments } from "@/lib/route";
 import { zoneAt } from "@/lib/geofence/tiers";
+import { loadWatcherEvents } from "@/lib/events/server";
+import { eventOnAt } from "@/lib/events/rules";
+import { pointInArea } from "@/lib/geofence/area-geometry";
 import { londonDayKey } from "@/lib/format";
 import { isDate, routesShown } from "@/lib/history-range";
 
@@ -47,7 +50,11 @@ export const GET = handle(async (request: Request, ctx: Ctx) => {
     return k >= fromDay && k <= toDay;
   });
   const zAreas = zoneAreas(areas);
-  const zoneOf = (p: { lat: number; lng: number }, at?: number) => zoneAt(p, okay, zAreas, [], at);
+  // Their events: black where and while one was on.
+  const events = (await loadWatcherEvents(w.id).catch(() => [])).filter((e) => e.status === "active");
+  const atEvent = (p: { lat: number; lng: number }, at: number) =>
+    events.some((e) => eventOnAt(e, at) && e.places.some((pl) => pointInArea(p, pl.geojson)));
+  const zoneOf = (p: { lat: number; lng: number }, at?: number) => (at != null && atEvent(p, at) ? "black" : zoneAt(p, okay, zAreas, [], at));
   const segments = colouredRouteSegments(records, zoneOf);
   const stops = records
     .filter((r) => r.kind === "visit")

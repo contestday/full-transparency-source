@@ -11,7 +11,7 @@ export interface MapFence {
   reference: string;
   geojson: { type: "Polygon"; coordinates: [number, number][][] } | { type: "MultiPolygon"; coordinates: [number, number][][][] };
   /** mine = my own areas; wish / want = watchers' areas; location = the public sample's Locations. */
-  group: "mine" | "wish" | "want" | "location";
+  group: "mine" | "wish" | "want" | "location" | "event";
   /** Wish areas: "outside" = amber when I'm outside it. */
   outside: boolean;
   sample: boolean;
@@ -88,6 +88,27 @@ export async function loadMapContext(supabase: SupabaseClient) {
         status: "active",
         currently_inside: false,
         description: a.name,
+      });
+    }
+  }
+  // Watchers' events that are on now or coming up (black; dashed until they're on).
+  const { loadAllEvents } = await import("@/lib/events/server");
+  for (const e of await loadAllEvents().catch(() => [])) {
+    if (e.phase !== "on" && e.phase !== "upcoming") continue;
+    for (const p of e.places) {
+      fences.push({
+        id: p.id ?? `${e.id}-${p.position}`,
+        reference: e.reference,
+        geojson: p.geojson as MapFence["geojson"],
+        group: "event",
+        outside: false,
+        sample: false,
+        name: `${e.title} · ${p.name}${e.phase === "on" ? " (on now)" : " (upcoming)"}`,
+        verification_status: "verified",
+        origin: "anonymous",
+        status: "active",
+        currently_inside: false,
+        description: e.title,
       });
     }
   }

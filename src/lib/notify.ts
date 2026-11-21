@@ -17,6 +17,10 @@ export type NotificationEvent =
   | "live_status_changed"
   | "plan_outcome_needed"
   | "plan_wish"
+  | "watch_event_set"
+  | "watch_event_cancelled"
+  | "watch_event_enter"
+  | "watch_event_exit"
   | "test";
 
 export interface NotificationMessage {

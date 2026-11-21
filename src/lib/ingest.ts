@@ -119,7 +119,13 @@ export async function evaluateGeofences(
   const sealedIds = new Set(sealedAreas.filter((a) => !a.sample).map((a) => a.id));
   const sampleNames = new Map(sealedAreas.filter((a) => a.sample).map((a) => [a.id, a.name]));
 
+  // Nothing can stop me being at home or leaving it (owner decision, 21 Nov
+  // 2026): while I'm at home, I'm never counted as in anyone's area.
+  const { loadAtHomeZone, isAtHome } = await import("@/lib/events/server");
+  const homeZone = await loadAtHomeZone().catch(() => null);
+
   for (const obs of sorted) {
+    const atHome = isAtHome(obs, homeZone);
     const { data: distances, error } = await supabase.rpc("geofence_signed_distances", {
       p_lat: obs.lat,
       p_lng: obs.lng,
@@ -139,8 +145,9 @@ export async function evaluateGeofences(
         if (st.inside && !nearby.has(id)) nearby.set(id, { reference: "", d: -20_000 });
       }
     }
-    for (const [id, { reference, d }] of nearby) {
+    for (const [id, { reference, d: rawD }] of nearby) {
       if (onlyNewAreas && states.has(id)) continue; // already being watched normally
+      const d = atHome ? Math.min(rawD, -1000) : rawD;
       const prev = states.get(id) ?? { inside: false, pendingInside: null, pendingCount: 0 };
       if (prev.last && prev.last >= obs.observed_at) continue; // out-of-order reading
       // A never-checked area with the phone standing still: one confident reading is enough.
