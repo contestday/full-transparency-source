@@ -16,7 +16,7 @@ export const MENU: { href: string; label: string; icon: IconName }[] = [
   { href: "/history", label: "History", icon: "history" },
   { href: "/history/watched", label: "Your view", icon: "eye" },
   { href: "/geofences/submit", label: "Watch", icon: "pin" },
-  { href: "/events", label: "Events", icon: "calendar" },
+  { href: "/events", label: "Events", icon: "target" },
   { href: "/watch", label: "Your places", icon: "layers" },
   { href: "/sample", label: "Sample", icon: "eye" },
   { href: "/plans", label: "Plans", icon: "calendar" },

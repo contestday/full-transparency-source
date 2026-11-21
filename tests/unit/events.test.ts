@@ -142,3 +142,19 @@ describe("Outlook-style repeats", () => {
     expect(describeRecurrence({ freq: "yearly", by: "nth", nth: 2, weekday: 6, month: 5, ...t }, { times: false })).toBe("Every year on the second Saturday of May");
   });
 });
+
+describe("my public restrictions on maps", () => {
+  it("draws my areas always, and my bans only while on (solid) or coming up (dashed), as background", async () => {
+    const { restrictionFeatures } = await import("@/components/restrictions");
+    const g = { type: "Polygon" as const, coordinates: [circleRing({ lat: 53.4, lng: -1.5 }, 500, 16)] };
+    const ev = (phase: "on" | "upcoming" | "ended" | "cancelled") => ({
+      reference: phase, title: phase, details: null, level: "demand" as const, starts_at: "", ends_at: "", status: "active" as const,
+      includes_home: false, is_owner: true, phase, places: [{ name: "P", kind: "venue" as const, center_lat: 0, center_lng: 0, radius_m: 500, geojson: g }],
+    });
+    const f = restrictionFeatures({ owner_first: "I", areas: [{ reference: "A", name: "Area", geojson: g }], events: [ev("on"), ev("upcoming"), ev("ended"), ev("cancelled")] });
+    expect(f).toHaveLength(3);
+    expect(f.every((x) => x.properties.context && x.properties.color === "#C62828")).toBe(true);
+    expect(f[1].properties.dashed).toBeFalsy();
+    expect(f[2].properties.dashed).toBe(true);
+  });
+});

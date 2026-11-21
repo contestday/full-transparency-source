@@ -12,6 +12,7 @@ import { forgetWatchLink, loadWatchLinks } from "@/lib/watch-links";
 import { useNow } from "@/lib/use-now";
 import type { PublicLiveStatus } from "@/lib/public-data";
 import { atHome, homeAreaFeatures } from "@/lib/home-area";
+import { restrictionFeatures, useRestrictions } from "@/components/restrictions";
 
 
 type StatusKey = keyof typeof LIVE_STATUS_META;
@@ -111,16 +112,20 @@ export function LiveStatusCard({ initial, week, today }: { initial: PublicLiveSt
   // In the home area there's no position: show the home area with a large marker instead.
   const home = pub.home_area ?? null;
   const inHome = Boolean(home) && atHome(status, s.public_lat);
+  // Where I mustn't go (my areas and bans): shown to everyone, underneath.
+  const restrictions = useRestrictions();
   const features = useMemo<MapFeature[]>(() => {
-    if (inHome) return homeAreaFeatures(home, { here: true, color: meta.color, hereLabel: `${label}
-In my home area: movement inside it is never shown.` });
-    if (s.public_lat == null || s.public_lng == null) return [];
+    const r = restrictionFeatures(restrictions);
+    if (inHome) return [...r, ...homeAreaFeatures(home, { here: true, color: meta.color, hereLabel: `${label}
+In my home area: movement inside it is never shown.` })];
+    if (s.public_lat == null || s.public_lng == null) return r;
     const c = { lat: s.public_lat, lng: s.public_lng };
     return [
+      ...r,
       { type: "Feature", geometry: { type: "Polygon", coordinates: [gridCellRing(c, s.cell_size_m ?? 1000)] }, properties: { color: meta.color, opacity: 0.2, dashed: true } },
       { type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 10, label: `${label}\nApproximate area (about ${cellKm} km square)` } },
     ];
-  }, [s.public_lat, s.public_lng, s.cell_size_m, meta.color, label, cellKm, inHome, home]);
+  }, [s.public_lat, s.public_lng, s.cell_size_m, meta.color, label, cellKm, inHome, home, restrictions]);
 
   if (pub.status === "disabled" && !watch) {
     return (

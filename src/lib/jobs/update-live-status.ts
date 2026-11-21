@@ -54,7 +54,9 @@ export async function updateLiveStatus(newObservations: Obs[] = []): Promise<Liv
         .eq("geofences.status", "active")
         .eq("geofences.origin", "admin"),
     ]);
-  const ownInside = (insideOwn ?? []).length > 0;
+  // My own bans (events) count like my own areas: red for everyone while I'm in one.
+  const inOwnerEvent = await import("@/lib/events/server").then((m) => m.insideOwnerEvent()).catch(() => false);
+  const ownInside = (insideOwn ?? []).length > 0 || inOwnerEvent;
   if (insideErr) throw insideErr;
   const readings = (recent ?? []).map((r) => ({
     observed_at: r.observed_at as string,

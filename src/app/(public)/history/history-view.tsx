@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
+import { restrictionFeatures, useRestrictions } from "@/components/restrictions";
 import { EmptyState, Icon, LegendItem, MapFrame, STATUS_TONE, StatChip } from "@/components/design";
 import { cn } from "@/components/ui";
 import { cardColour } from "@/components/zone-card";
@@ -135,8 +136,9 @@ export function HistoryView({
   const exact = useMemo(() => records.some((r) => r.kind === "track" && r.cell_size_m === 0), [records]);
   const usedZones = useMemo(() => new Set(route.map((r) => r.zone)), [route]);
 
+  const restrictions = useRestrictions();
   const features = useMemo<MapFeature[]>(() => {
-    const f: MapFeature[] = [...homeAreaFeatures(homeArea)];
+    const f: MapFeature[] = [...restrictionFeatures(restrictions), ...homeAreaFeatures(homeArea)];
     if (searchArea) f.push({ type: "Feature", geometry: searchArea, properties: { color: "#142B49", opacity: 0.04, dashed: true, label: "The place searched" } });
     f.push(...route.map((r) => ({
       type: "Feature",
@@ -167,7 +169,7 @@ export function HistoryView({
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [r.public_lng, r.public_lat] }, properties: { color, size: on ? 14 : 11, num: i + 1, label } });
     });
     return f;
-  }, [route, visits, selected, stopZones, watchZones, homeArea, searchArea]);
+  }, [route, visits, selected, stopZones, watchZones, homeArea, searchArea, restrictions]);
 
   // A place search: zoom to the place.
   const searchFocus = useMemo(() => (searchArea ? { key: 1, features: [{ type: "Feature", geometry: searchArea, properties: {} } as MapFeature] } : null), [searchArea]);

@@ -26,6 +26,8 @@ export interface EventView {
   ends_at: string;
   status: "active" | "cancelled";
   includes_home: boolean;
+  /** One of my own bans (public). */
+  is_owner?: boolean;
   recurrence?: Recurrence | null;
   phase: EventPhase;
   places: EventPlaceView[];
@@ -66,7 +68,7 @@ export function EventCardBody({ e, ownerFirst, children }: { e: EventView; owner
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-block h-3 w-3 rounded-full" style={{ background: EVENT_COLOR }} aria-hidden="true" />
         <span className="text-base font-semibold">{e.title}</span>
-        <EventLevelBadge level={e.level} />
+        {e.is_owner ? <Badge tone="red">Banned</Badge> : <EventLevelBadge level={e.level} />}
         <Badge tone={e.phase === "on" ? "black" : "neutral"}>{e.recurrence && e.phase === "upcoming" ? "Repeats" : PHASE_LABEL[e.phase]}</Badge>
         <span className="ml-auto font-mono text-xs text-muted">{e.reference}</span>
       </div>

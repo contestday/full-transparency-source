@@ -8,8 +8,8 @@ import { notifyAdmins } from "@/lib/notify";
 import { auditSystem } from "@/lib/audit";
 import { createWatcher, findWatcher, loadOwnerProfile } from "@/lib/watchers";
 import { assertNotLockedSample } from "@/lib/sample-watcher";
-import { buildPlaces, eventSubmissionSchema, includesHome } from "@/lib/events/server";
-import { checkEventWindow, checkRecurrence, describeRecurrence, EVENT_LEVEL_META, EventRuleError, homeAssurance, seriesWindow, type Recurrence } from "@/lib/events/rules";
+import { buildPlaces, eventSubmissionSchema, includesHome, resolveWhen } from "@/lib/events/server";
+import { checkEventWindow, describeRecurrence, EVENT_LEVEL_META, EventRuleError, homeAssurance, type Recurrence } from "@/lib/events/rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,33 +26,12 @@ export const POST = handle(async (request: Request) => {
   if (looksAutomated(input.form_started_at, input.website)) {
     return json({ reference: makeReference("E"), watch_token: input.watch_token ? null : randomCode(24) }, { status: 201 });
   }
-  let startsAt = Date.parse(input.starts_at ?? "");
-  let endsAt = Date.parse(input.ends_at ?? "");
-  let recurrence: Recurrence | null = null;
+  let startsAt: number;
+  let endsAt: number;
+  let recurrence: Recurrence | null;
   let places;
   try {
-    if (input.recurrence) {
-      const { first_date, end, ...r } = input.recurrence;
-      const monthly = r.freq === "monthly" || r.freq === "yearly";
-      recurrence = {
-        freq: r.freq,
-        interval: r.interval,
-        ...(r.freq === "weekly" ? { days: [...new Set(r.days ?? [])].sort() } : {}),
-        ...(monthly ? (r.by === "nth" ? { by: "nth" as const, nth: r.nth, weekday: r.weekday } : { by: "day" as const, day: r.day }) : {}),
-        ...(r.freq === "yearly" ? { month: r.month } : {}),
-        start_time: r.start_time,
-        end_time: r.end_time,
-        anchor: first_date,
-        count: end.type === "count" ? end.count : null,
-        until: end.type === "date" ? end.until : null,
-      };
-      checkRecurrence(recurrence);
-      if (end.type === "date" && end.until < first_date) throw new EventRuleError("The end date must be on or after the start date.");
-      const w = seriesWindow(recurrence, first_date, { until: recurrence.until, count: recurrence.count });
-      if (!w) throw new EventRuleError("No day matches that repeat between those dates.");
-      // The pattern counts from the start date the watcher chose.
-      ({ startsAt, endsAt } = w);
-    }
+    ({ startsAt, endsAt, recurrence } = resolveWhen(input));
     checkEventWindow(startsAt, endsAt);
     places = buildPlaces(input.places);
   } catch (err) {

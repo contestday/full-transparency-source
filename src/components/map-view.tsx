@@ -19,6 +19,8 @@ export interface MapFeatureProps {
   opacity?: number;
   /** A number drawn on a point (matches a numbered card in a list). */
   num?: number;
+  /** Background only (e.g. my restricted areas): the map doesn't zoom to fit it unless nothing else is shown. */
+  context?: boolean;
 }
 
 export type MapFeature = Feature<Geometry, MapFeatureProps>;
@@ -137,7 +139,8 @@ function boundsOf(features: MapFeature[]): maplibregl.LngLatBounds | null {
       any = true;
     } else if (Array.isArray(c)) c.forEach(visit);
   };
-  for (const f of features) {
+  const main = features.filter((f) => !f.properties?.context);
+  for (const f of main.length ? main : features) {
     if (f.geometry && "coordinates" in f.geometry) visit(f.geometry.coordinates);
   }
   return any ? b : null;

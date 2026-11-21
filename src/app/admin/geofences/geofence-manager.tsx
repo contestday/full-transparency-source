@@ -9,7 +9,6 @@ import { api } from "@/lib/client-api";
 import { ConfirmButton } from "@/components/confirm-button";
 import { GEOFENCE_CATEGORIES } from "@/lib/geofence/submission";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { GeofenceSubmitForm } from "@/app/(public)/geofences/submit/submit-form";
 
 export interface AdminFence {
   id: string;
@@ -70,8 +69,6 @@ export function GeofenceManager({
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  // The same Wish / Want / Location form everyone uses, with its own watch link.
-  const [watching, setWatching] = useState(false);
   const [shape, setShape] = useState<DrawnShape | null>(null);
 
   const shown = fences.filter((f) => statusFilter === "all" || f.status === "active");
@@ -129,43 +126,18 @@ export function GeofenceManager({
           <option value="all">All (incl. withdrawn)</option>
         </Select>
         {isAdmin && (
-          <Button
-            onClick={() => {
-              setWatching((w) => !w);
-              setCreating(false);
-            }}
-          >
-            {watching ? "Close" : "Add a Wish, Want or Location"}
-          </Button>
-        )}
-        {isAdmin && (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setCreating((c) => !c);
-              setWatching(false);
-            }}
-          >
-            {creating ? "Cancel" : "Add a noted area"}
-          </Button>
+          <Button onClick={() => setCreating((c) => !c)}>{creating ? "Cancel" : "Add my area (shown to everyone)"}</Button>
         )}
       </div>
-
-      {watching && (
-        <Card className="space-y-3">
-          <p className="text-sm text-muted">
-            The same form everyone uses. You get your own private watch link, saved in this browser. Your Locations are sealed
-            with that link, as they are for anyone.
-          </p>
-          <GeofenceSubmitForm />
-        </Card>
-      )}
 
       {creating && (
         <form onSubmit={createAdminFence}>
           <Card className="space-y-3">
+            <p className="text-sm text-muted">
+              Your own restricted area. Everyone sees it on the maps, in red, and if you&apos;re in it the live marker shows red for everyone.
+            </p>
             <GeofenceDrawer value={shape} onChange={setShape} context={features} />
-            <Field label="Description" htmlFor="af-desc">
+            <Field label="Name (shown to everyone; first line)" htmlFor="af-desc">
               <Input id="af-desc" name="description" maxLength={1000} />
             </Field>
             <Field label="Category" htmlFor="af-cat">

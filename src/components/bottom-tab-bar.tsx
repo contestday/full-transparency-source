@@ -14,7 +14,7 @@ import { MENU, isCurrent, useLiveStatus, useStaff } from "@/components/site-head
 type Tab = { href: string; label: string; icon: IconName };
 
 /**
- * Phones: a bottom tab bar with the four main places and More (every other
+ * Phones: a bottom tab bar with the five main places and More (every other
  * page, Share and the live status, in a sheet). Hidden on large screens,
  * where the header shows the menu.
  */
@@ -49,7 +49,8 @@ export function BottomTabBar() {
     { href: "/", label: "Home", icon: "home" },
     { href: "/history", label: "History", icon: "history" },
     { href: "/plans", label: "Plans", icon: "calendar" },
-    watcher && hasAreas ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch a place", icon: "pin" },
+    { href: "/events", label: "Events", icon: "target" },
+    watcher && hasAreas ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch", icon: "pin" },
   ];
   const inTabs = (href: string) => tabs.some((t) => t.href === href);
   const moreItems = MENU.filter((m) => !inTabs(m.href) && (m.href !== "/history/watched" || watcher));
@@ -61,7 +62,7 @@ export function BottomTabBar() {
     <>
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-white/95 px-1 pb-[calc(10px+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-white/95 px-1 pb-[calc(10px+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden print:hidden"
       >
         {tabs.map((t) => {
           const on = isCurrent(pathname, t.href);
@@ -72,7 +73,7 @@ export function BottomTabBar() {
               aria-current={on ? "page" : undefined}
               className={cn("flex flex-col items-center justify-center gap-0.5 whitespace-nowrap text-xs font-semibold", on ? "text-accent" : "text-muted")}
             >
-              <span className={cn("flex h-[30px] w-14 items-center justify-center rounded-full", on && "bg-blue-100")}>
+              <span className={cn("flex h-[30px] w-12 items-center justify-center rounded-full", on && "bg-blue-100")}>
                 <Icon name={t.icon} />
               </span>
               {t.label}
@@ -85,7 +86,7 @@ export function BottomTabBar() {
           aria-haspopup="dialog"
           className={cn("flex flex-col items-center justify-center gap-0.5 text-xs font-semibold", moreOn ? "text-accent" : "text-muted")}
         >
-          <span className={cn("flex h-[30px] w-14 items-center justify-center rounded-full", moreOn && "bg-blue-100")}>
+          <span className={cn("flex h-[30px] w-12 items-center justify-center rounded-full", moreOn && "bg-blue-100")}>
             <Icon name="menu" />
           </span>
           More

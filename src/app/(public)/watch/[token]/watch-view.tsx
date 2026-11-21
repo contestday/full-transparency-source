@@ -19,6 +19,7 @@ import type { DrawnShape } from "@/components/geofence-drawer";
 import { LIVE_STATUS_META, WATCH_LABELS } from "@/lib/live-status";
 import { fmtSqMiles, TIER_META, ZONE_COLOR, ZONE_LABEL, type Tier, type WideMode, type Zone } from "@/lib/geofence/tiers";
 import { eventFeatures, type EventView } from "@/components/event-card";
+import { restrictionFeatures, useRestrictions } from "@/components/restrictions";
 import { EVENT_COLOR, homeAssurance } from "@/lib/events/rules";
 import { YourEvents } from "@/app/(public)/events/your-events";
 import { EventForm } from "@/app/(public)/events/event-form";
@@ -222,6 +223,7 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
     [],
   );
 
+  const restrictions = useRestrictions();
   const features = useMemo<MapFeature[]>(() => {
     if (!view) return [];
     // The live position (or the home marker) belongs with periods that include now.
@@ -232,6 +234,8 @@ export function WatchView({ token, vapidPublicKey, sample = false }: { token: st
 In my home area: movement inside it is never shown.` });
     f.push(...view.areas.flatMap((a, i) => areaFeature(a, i, a.reference === selected) ?? []));
     f.push(...eventFeatures(events));
+    // Where I mustn't go (my own areas and bans): shown to everyone.
+    f.push(...restrictionFeatures(restrictions));
     for (const s of journey?.segments ?? []) {
       f.push({ type: "Feature", geometry: { type: "LineString", coordinates: s.coords }, properties: { color: ZONE_COLOR[s.zone] } });
     }
@@ -248,7 +252,7 @@ In my home area: movement inside it is never shown.` });
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [c.lng, c.lat] }, properties: { color: meta.color, size: 11, label: `${meta.label}\nApproximate area` } });
     }
     return f;
-  }, [view, meta, journey, selected, rangeKey, areaFeature, events]);
+  }, [view, meta, journey, selected, rangeKey, areaFeature, events, restrictions]);
 
   /** Tap an area: highlight it and zoom the map to it. */
   function showArea(a: Area, i: number) {

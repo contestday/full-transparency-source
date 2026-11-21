@@ -100,10 +100,11 @@ export async function loadMapContext(supabase: SupabaseClient) {
         id: p.id ?? `${e.id}-${p.position}`,
         reference: e.reference,
         geojson: p.geojson as MapFence["geojson"],
-        group: "event",
+        // My own bans sit with my own areas (shown to everyone); watchers' events are black.
+        group: e.is_owner ? "mine" : "event",
         outside: false,
         sample: false,
-        name: `${e.title} · ${p.name}${e.phase === "on" ? " (on now)" : " (upcoming)"}`,
+        name: `${e.is_owner ? "Banned: " : ""}${e.title} · ${p.name}${e.phase === "on" ? " (on now)" : " (upcoming)"}`,
         verification_status: "verified",
         origin: "anonymous",
         status: "active",

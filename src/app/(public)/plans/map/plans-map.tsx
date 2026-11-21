@@ -6,6 +6,7 @@ import { gridCellRing } from "@/lib/geo";
 import { categoryLabel, STATUS_LABELS, type PlanStatus } from "@/lib/plans";
 import type { PublicPlan } from "@/lib/public-data";
 import { fmtDate } from "@/lib/format";
+import { restrictionFeatures, useRestrictions } from "@/components/restrictions";
 
 /** `context`: areas drawn underneath (e.g. the viewer's own areas); the map still zooms to the plans. */
 export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full", context }: { plans: PublicPlan[]; className?: string; context?: MapFeature[] }) {
@@ -37,7 +38,9 @@ export function PlansMap({ plans, className = "h-[65vh] min-h-80 w-full", contex
       }),
     [plans],
   );
-  const all = useMemo(() => (context?.length ? [...context, ...features] : features), [context, features]);
+  // Where I mustn't go: shown to everyone, underneath (the map still zooms to the plans).
+  const restrictions = useRestrictions();
+  const all = useMemo(() => [...restrictionFeatures(restrictions), ...(context ?? []), ...features], [restrictions, context, features]);
   const focus = useMemo(() => (context?.length ? { key: 1, features } : null), [context, features]);
   return <LazyMap features={all} fit={context?.length ? false : true} focus={focus} className={className} ariaLabel="Plans map" />;
 }

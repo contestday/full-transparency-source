@@ -11,12 +11,14 @@ import {
   EVENT_LEVEL_META,
   EVENT_RULES,
   EventRuleError,
+  checkRecurrence,
   eventOnAt,
   eventPhase,
   insidePlace,
   placesInclude,
   type EventLevel,
   type EventPhase,
+  seriesWindow,
   type Recurrence,
 } from "@/lib/events/rules";
 
@@ -72,6 +74,36 @@ export const eventSubmissionSchema = z.object({
 });
 export type EventSubmission = z.infer<typeof eventSubmissionSchema>;
 
+/** The event's whole window, and its repeat pattern if it has one. Throws EventRuleError. */
+export function resolveWhen(input: Pick<EventSubmission, "starts_at" | "ends_at" | "recurrence">): { startsAt: number; endsAt: number; recurrence: Recurrence | null } {
+  if (!input.recurrence) {
+    const startsAt = Date.parse(input.starts_at ?? "");
+    const endsAt = Date.parse(input.ends_at ?? "");
+    if (!Number.isFinite(startsAt) || !Number.isFinite(endsAt)) throw new EventRuleError("Choose when the event starts and ends.");
+    if (endsAt <= startsAt) throw new EventRuleError("The event must end after it starts.");
+    return { startsAt, endsAt, recurrence: null };
+  }
+  const { first_date, end, ...r } = input.recurrence;
+  const monthly = r.freq === "monthly" || r.freq === "yearly";
+  const recurrence: Recurrence = {
+    freq: r.freq,
+    interval: r.interval,
+    ...(r.freq === "weekly" ? { days: [...new Set(r.days ?? [])].sort() } : {}),
+    ...(monthly ? (r.by === "nth" ? { by: "nth" as const, nth: r.nth, weekday: r.weekday } : { by: "day" as const, day: r.day }) : {}),
+    ...(r.freq === "yearly" ? { month: r.month } : {}),
+    start_time: r.start_time,
+    end_time: r.end_time,
+    anchor: first_date,
+    count: end.type === "count" ? end.count : null,
+    until: end.type === "date" ? end.until : null,
+  };
+  checkRecurrence(recurrence);
+  if (end.type === "date" && end.until < first_date) throw new EventRuleError("The end date must be on or after the start date.");
+  const w = seriesWindow(recurrence, first_date, { until: recurrence.until, count: recurrence.count });
+  if (!w) throw new EventRuleError("No day matches that repeat between those dates.");
+  return { startsAt: w.startsAt, endsAt: w.endsAt, recurrence };
+}
+
 export interface EventPlaceRow {
   id?: string;
   position: number;
@@ -122,7 +154,9 @@ export async function includesHome(places: { geojson: AreaGeometry }[]): Promise
 export interface WatchEvent {
   id: string;
   reference: string;
-  watcher_id: string;
+  watcher_id: string | null;
+  /** One of my own bans: public. */
+  is_owner: boolean;
   title: string;
   details: string | null;
   level: EventLevel;
@@ -137,7 +171,7 @@ export interface WatchEvent {
   places: EventPlaceRow[];
 }
 
-const EVENT_COLS = "id, reference, watcher_id, title, details, level, starts_at, ends_at, status, cancelled_at, includes_home, recurrence, created_at";
+const EVENT_COLS = "id, reference, watcher_id, title, details, level, starts_at, ends_at, status, cancelled_at, includes_home, recurrence, is_owner, created_at";
 const PLACE_COLS = "id, event_id, position, name, kind, center_lat, center_lng, radius_m, geojson, area_m2";
 
 async function withPlaces(rows: Omit<WatchEvent, "places" | "phase">[]): Promise<WatchEvent[]> {
@@ -181,6 +215,45 @@ export async function loadAllEvents(): Promise<WatchEvent[]> {
     throw error;
   }
   return withPlaces((data ?? []) as Omit<WatchEvent, "places" | "phase">[]);
+}
+
+/** My own bans (public): everything but cancelled ones. */
+export async function loadOwnerEvents(): Promise<WatchEvent[]> {
+  const { data, error } = await createServiceClient()
+    .from("watch_events")
+    .select(EVENT_COLS)
+    .eq("is_owner", true)
+    .neq("status", "cancelled")
+    .order("starts_at", { ascending: true })
+    .limit(500);
+  if (error) {
+    if (/watch_events|is_owner/.test(error.message)) return [];
+    throw error;
+  }
+  return withPlaces((data ?? []) as Omit<WatchEvent, "places" | "phase">[]);
+}
+
+/** My own restricted areas (public): name (first line) and shape only. */
+export async function loadOwnerAreas(): Promise<{ reference: string; name: string; geojson: AreaGeometry }[]> {
+  const { data } = await createServiceClient()
+    .from("geofences_geojson")
+    .select("reference, description, geojson")
+    .eq("origin", "admin")
+    .eq("status", "active");
+  return ((data ?? []) as { reference: string; description: string | null; geojson: AreaGeometry | null }[]).flatMap((a) =>
+    a.geojson ? [{ reference: a.reference, name: (a.description ?? "").split("\n")[0], geojson: a.geojson }] : [],
+  );
+}
+
+/** Am I inside one of my own bans right now? (Red for everyone.) */
+export async function insideOwnerEvent(): Promise<boolean> {
+  const { data, error } = await createServiceClient()
+    .from("watch_event_state")
+    .select("place_id, watch_event_places!inner(watch_events!inner(is_owner))")
+    .eq("inside", true)
+    .eq("watch_event_places.watch_events.is_owner", true)
+    .limit(1);
+  return !error && (data ?? []).length > 0;
 }
 
 /** Events on right now (not cancelled), with their places. */
@@ -275,6 +348,15 @@ export async function evaluateEvents(observations: { observed_at: string; lat: n
     const level = EVENT_LEVEL_META[c.event.level].label;
     const verb = c.type === "enter" ? "may be at" : "may have left";
     const time = ukTime(latest.observed_at);
+    if (c.event.is_owner) {
+      await notifyAdmins({
+        event: c.type === "enter" ? "watch_event_enter" : "watch_event_exit",
+        title: `${c.type === "enter" ? "Entered" : "Left"} a place you're banned from: ${c.event.title}`,
+        body: `GPS at ${time}: ${c.type === "enter" ? "entered" : "left"} ${c.place.name} (${c.event.reference}). Everyone sees red while you're there.`,
+        url: "/admin/events",
+      });
+      continue;
+    }
     await notifyAdmins({
       event: c.type === "enter" ? "watch_event_enter" : "watch_event_exit",
       title: `${c.type === "enter" ? "Entered" : "Left"} event (${level}): ${c.event.title}`,
@@ -282,9 +364,10 @@ export async function evaluateEvents(observations: { observed_at: string; lat: n
       url: "/admin/events",
     });
     if (!alertsOn) continue;
+    if (!c.event.watcher_id) continue;
     await supabase.from("watcher_alerts").insert({ watcher_id: c.event.watcher_id, event: c.type, tier: "event", outside: false, reference: c.event.reference, since: latest.observed_at });
     await pushToWatcher(
-      c.event.watcher_id,
+      c.event.watcher_id!,
       JSON.stringify({
         title: `${owner.first} ${verb} your event: ${c.event.title}`,
         body:

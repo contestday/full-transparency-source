@@ -6,6 +6,7 @@ import { EVENTS_NOTE } from "@/lib/events/rules";
 import { createServiceClient } from "@/lib/supabase/server";
 import { fmtDateTime } from "@/lib/format";
 import { AdminEventsMap, AdminEventsCalendar } from "./events-map";
+import { OwnerEvents } from "./owner-events";
 import { EventCardBody, type EventView } from "@/components/event-card";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,10 @@ export const dynamic = "force-dynamic";
 /** Every watcher's events: upcoming, on now, and the record. Only I see these. */
 export default async function AdminEventsPage() {
   await requirePageRole(["admin"]);
-  const [events, owner] = await Promise.all([loadAllEvents(), loadOwnerProfile()]);
+  const [all, owner] = await Promise.all([loadAllEvents(), loadOwnerProfile()]);
+  // Mine (public bans) are listed on their own; the rest are watchers' events.
+  const mine = all.filter((e) => e.is_owner);
+  const events = all.filter((e) => !e.is_owner);
   const ids = events.map((e) => e.id);
   const { data: log } = ids.length
     ? await createServiceClient().from("watch_event_log").select("event_id, event_type, observed_at").in("event_id", ids).order("observed_at")
@@ -53,10 +57,12 @@ export default async function AdminEventsPage() {
   );
   return (
     <div className="space-y-8">
-      <PageHeader title="Events" description="Places watchers would rather you weren't, for that time only. Shown in black, only to you and whoever set them." />
+      <PageHeader title="Events" description="Events you're banned from (public, red), and places watchers would rather you weren't (black, only you and them)." />
       <p className="text-sm text-muted">{EVENTS_NOTE}</p>
+      <OwnerEvents events={mine.map(view)} ownerFirst={owner.first} />
+      <h2 className="pt-4 text-xl font-bold">Watchers&apos; events</h2>
       <AdminEventsMap events={[...on, ...upcoming].map(view)} />
-      <AdminEventsCalendar events={events.map(view)} />
+      <AdminEventsCalendar events={[...events, ...mine].map(view)} />
       {section("On now", on, "None on now.")}
       {section("Upcoming", upcoming, "None upcoming.")}
       {section("Ended and cancelled", past, "None yet.")}

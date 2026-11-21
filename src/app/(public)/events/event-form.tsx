@@ -29,7 +29,16 @@ function localValue(ms: number): string {
  * Set an event: somewhere you'd rather I wasn't, for that time only.
  * Optionally on a watch link already saved in this browser.
  */
-export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdded?: () => void } = {}) {
+export function EventForm({
+  watchToken,
+  onAdded,
+  owner = false,
+}: {
+  watchToken?: string;
+  onAdded?: () => void;
+  /** Admin: one of my own bans (public, no level, no notice, no watch link). */
+  owner?: boolean;
+} = {}) {
   const [startedAt] = useState(() => Date.now());
   const [level, setLevel] = useState<EventLevel>("want");
   const [places, setPlaces] = useState<PlaceDraft[]>([]);
@@ -44,9 +53,9 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMinStart(localValue(Date.now() + EVENT_RULES.minNoticeMs + 5 * 60_000));
-    if (!watchToken) setExisting(loadWatchLinks()[0]?.token ?? null);
-  }, [watchToken]);
+    if (!owner) setMinStart(localValue(Date.now() + EVENT_RULES.minNoticeMs + 5 * 60_000));
+    if (!watchToken && !owner) setExisting(loadWatchLinks()[0]?.token ?? null);
+  }, [watchToken, owner]);
 
   const features = useMemo<MapFeature[]>(
     () =>
@@ -75,7 +84,7 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
     if (repeat) {
       const w = draftWindow(repeat);
       if (typeof w === "string") return setError(w);
-      if (w.startsAt < Date.now() + EVENT_RULES.minNoticeMs) return setError("The first time must be at least 48 hours from now.");
+      if (!owner && w.startsAt < Date.now() + EVENT_RULES.minNoticeMs) return setError("The first time must be at least 48 hours from now.");
       when = { recurrence: draftToPayload(repeat) };
     } else {
       const starts = String(f.get("starts_at") || "");
@@ -84,11 +93,31 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
       const startsAt = new Date(starts);
       const endsAt = new Date(ends);
       if (endsAt <= startsAt) return setError("The event must end after it starts.");
-      if (startsAt.getTime() < Date.now() + EVENT_RULES.minNoticeMs) return setError("An event must be set at least 48 hours before it starts.");
+      if (!owner && startsAt.getTime() < Date.now() + EVENT_RULES.minNoticeMs) return setError("An event must be set at least 48 hours before it starts.");
       when = { starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString() };
     }
     const token = watchToken ?? (existing && useExisting ? existing : null);
     setBusy(true);
+    if (owner) {
+      try {
+        const res = await fetch("/api/admin/events", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: f.get("title"), details: f.get("details") || null, ...when, places }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) return setError(body.details?.[0]?.message ?? body.error ?? "Could not save the event");
+        setPlaces([]);
+        setRepeat(null);
+        (e.target as HTMLFormElement).reset();
+        onAdded?.();
+      } catch {
+        setError("Network error. Please try again.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     try {
       const res = await fetch("/api/watch-events", {
         method: "POST",
@@ -196,6 +225,7 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
         </Field>
       </Card>
 
+      {!owner && (
       <Card className="space-y-3">
         <h2 className="text-lg font-semibold">How strongly?</h2>
         <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Level">
@@ -217,6 +247,7 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
           ))}
         </div>
       </Card>
+      )}
 
       <Card className="space-y-3">
         <h2 className="text-lg font-semibold">Where</h2>
@@ -260,17 +291,19 @@ export function EventForm({ watchToken, onAdded }: { watchToken?: string; onAdde
 
       <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
 
-      {!watchToken && existing && (
+      {!watchToken && !owner && existing && (
         <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-1" checked={useExisting} onChange={(e) => setUseExisting(e.target.checked)} />
           <span>Add it to the watch link saved in this browser</span>
         </label>
       )}
       <p className="text-sm text-muted">
-        I&apos;ll see the event, its places and times. Nobody else will. It&apos;s a wish, not a legal order.
+        {owner
+          ? "Shown to everyone, in red, like plans. While you're in it, everyone sees red."
+          : "I'll see the event, its places and times. Nobody else will. It's a wish, not a legal order."}
       </p>
       <Button type="submit" data-save="1" disabled={busy}>
-        {busy ? "Saving…" : "Save event"}
+        {busy ? "Saving…" : owner ? "Save ban" : "Save event"}
       </Button>
     </form>
   );

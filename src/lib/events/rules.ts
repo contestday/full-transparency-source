@@ -93,7 +93,7 @@ export function homeAssurance(first: string): string {
 }
 
 export const EVENTS_NOTE =
-  "Events, like Wish and Want, express wishes, not legal orders. They're shown only to me and to whoever set them, never on public pages.";
+  "Your events, like Wish and Want, express wishes, not legal orders. They're shown only to me and to you, never on public pages. Events I'm banned from are different: they're public, for everyone to see.";
 
 // ------------------------------------------------------------ repeating events
 // Outlook-style repeats (UK dates and times):
