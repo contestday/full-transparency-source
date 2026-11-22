@@ -123,6 +123,21 @@ export async function getPublicPlans(opts: { from?: string; to?: string; categor
   return plans.map((p) => ({ ...p, extra_locations: byPlan.get(p.id) ?? [] }));
 }
 
+/** One published plan (with its further locations), or null. */
+export async function getPublicPlan(id: string): Promise<PublicPlan | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data, error } = await createServiceClient().from("public_plans").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const { data: locs } = await createServiceClient().from("public_plan_locations").select("*").eq("plan_id", id).order("position");
+  const extra = ((locs ?? []) as (PublicPlanLocation & { plan_id: string })[]).map((l) => {
+    const rest: Partial<typeof l> = { ...l };
+    delete rest.plan_id;
+    return rest as PublicPlanLocation;
+  });
+  return { ...(data as Omit<PublicPlan, "extra_locations">), extra_locations: extra };
+}
+
 export interface PublicLiveStatus {
   status: "green" | "yellow" | "amber" | "red" | "purple" | "unknown" | "disabled";
   public_lat: number | null;

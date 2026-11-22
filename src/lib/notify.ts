@@ -17,6 +17,7 @@ export type NotificationEvent =
   | "live_status_changed"
   | "plan_outcome_needed"
   | "plan_wish"
+  | "plan_police_report"
   | "watch_event_set"
   | "watch_event_cancelled"
   | "watch_event_enter"
