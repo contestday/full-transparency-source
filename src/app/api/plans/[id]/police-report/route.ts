@@ -15,15 +15,16 @@ export const dynamic = "force-dynamic";
 const body = z.object({
   concern: z.string().trim().min(PLAN_REPORT_RULES.concernMin).max(PLAN_REPORT_RULES.concernMax),
   named: z.boolean().default(false),
+  to: z.enum(["police", "crimestoppers"]).default("police"),
   form_started_at: z.number().int(),
   website: z.string().max(200).default(""),
-  /** The reporter's own watch link, which must have police reporting turned on. */
+  /** The reporter's own watch link, which must have reporting turned on. */
   token: z.string().trim().max(40),
 });
 
 /**
- * Someone has prepared a police report about one of my plans. They send it
- * to the police themselves; this only tells me, so nothing happens behind
+ * Someone has prepared a report about one of my plans. They send it to the
+ * police or Crimestoppers themselves; this only tells me, so nothing happens behind
  * my back. Their concern is passed on to me; their name and contact are not
  * (only whether they gave them).
  */
@@ -46,11 +47,12 @@ export const POST = handle(async (request: Request, ctx: { params: Promise<{ id:
   ]);
 
   await auditSystem("anonymous", { action: "plan.police_report", resourceType: "plan", resourceId: id });
+  const who = input.to === "crimestoppers" ? "to Crimestoppers, anonymous" : `to the police, ${input.named ? "named" : "anonymous"}`;
   const concern = input.concern.length > 600 ? `${input.concern.slice(0, 600)}…` : input.concern;
   await notifyAdmins({
     event: "plan_police_report",
-    title: "Police report prepared about a plan",
-    body: `"${plan.title}" (${input.named ? "named" : "anonymous"}): ${concern}`,
+    title: "Report prepared about a plan",
+    body: `"${plan.title}" (${who}): ${concern}`,
     url: "/admin/plans",
   });
   return json({ ok: true }, { status: 201 });

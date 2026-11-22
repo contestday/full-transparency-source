@@ -2,7 +2,7 @@ import { PlanPoliceButton } from "./plan-police-button";
 import { Badge, Button, Select } from "@/components/ui";
 import { Icon, Segmented, type IconName } from "@/components/design";
 import { PLAN_CATEGORIES, PLAN_STATUSES, PRIVATE_LOCATION_LABEL, STATUS_LABELS, categoryLabel, type PlanStatus } from "@/lib/plans";
-import { fmtDate, fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
+import { fmtDateTime, fmtTime, londonDayKey } from "@/lib/format";
 import type { PublicPlan } from "@/lib/public-data";
 import { needsOutcome } from "@/lib/plan-outcome";
 import { ZoneCard } from "@/components/zone-card";
@@ -96,27 +96,8 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function planWhen(p: PublicPlan): string {
-  const start = p.all_day ? fmtDate(p.starts_at) : `${fmtDate(p.starts_at)}, ${fmtTime(p.starts_at)}`;
-  if (!p.ends_at) return start;
-  const sameDay = fmtDate(p.starts_at) === fmtDate(p.ends_at);
-  if (p.all_day) return sameDay ? start : `${start} – ${fmtDate(p.ends_at)}`;
-  return sameDay ? `${start}–${fmtTime(p.ends_at)}` : `${start} – ${fmtDate(p.ends_at)}, ${fmtTime(p.ends_at)}`;
-}
-
-export function planWhere(p: PublicPlan): string {
-  if (p.private_location) return PRIVATE_LOCATION_LABEL;
-  if (p.venue_name) {
-    // Avoid "The Crown, The Crown, Riverside" when the area label repeats the name.
-    let area = p.public_area_label?.trim() ?? "";
-    if (area.toLowerCase().startsWith(p.venue_name.toLowerCase())) {
-      area = area.slice(p.venue_name.length).replace(/^[,\s]+/, "");
-    }
-    return p.venue_name + (area ? `, ${area}` : "");
-  }
-  if (p.public_area_label) return `${p.public_area_label} (general area)`;
-  return "Location not published";
-}
+import { planWhen, planWhere } from "@/lib/plan-police";
+export { planWhen, planWhere };
 
 /** Where a plan is on the map (its main place, or its first located stop), if published. */
 export function planPoint(p: PublicPlan): { lat: number; lng: number } | null {

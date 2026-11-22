@@ -10,7 +10,7 @@ import { planWhen, planWhere } from "../../plans-shared";
 import { PlanPoliceReport } from "./plan-police-report";
 
 export const metadata: Metadata = {
-  title: "Report a plan to the police",
+  title: "Report a plan",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };
@@ -36,8 +36,8 @@ export default async function PlanPolicePage({ params }: PageProps<"/plans/[id]/
   return (
     <>
       <PageHead
-        title="Report a plan to the police"
-        lead="If you think this plan is illegal, you can tell the police. You write your concern; you send it."
+        title="Report a plan"
+        lead="If you think this plan is illegal, you can tell the police, or Crimestoppers without giving your name. You write your concern; you send it."
       />
       <Container className="max-w-3xl space-y-6 pb-20 pt-6">
         <PlanPoliceReport planId={plan.id} facts={facts} contact={contact} />
