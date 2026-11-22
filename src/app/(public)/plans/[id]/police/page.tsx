@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublicPlan } from "@/lib/public-data";
 import { loadPoliceContact } from "@/lib/police-contact";
+import { policeReportsEnabled } from "@/lib/police-reports";
 import { PRIVATE_LOCATION_LABEL, STATUS_LABELS, categoryLabel, type PlanStatus } from "@/lib/plans";
 import { planStops, type PlanFacts } from "@/lib/plan-police";
 import { Container, PageHead } from "@/components/design";
@@ -19,7 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function PlanPolicePage({ params }: PageProps<"/plans/[id]/police">) {
   const { id } = await params;
-  if (!UUID.test(id)) notFound();
+  if (!UUID.test(id) || !(await policeReportsEnabled())) notFound();
   const [plan, contact] = await Promise.all([getPublicPlan(id).catch(() => null), loadPoliceContact().catch(() => null)]);
   if (!plan) notFound();
   const facts: PlanFacts = {

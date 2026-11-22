@@ -1,10 +1,12 @@
 import { requirePageRole } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
+import { loadGeofenceOverview } from "@/lib/geofence/overview";
+import { GeofenceOverview } from "./geofence-overview";
 import { GeofenceManager, type AdminFence, type LegalRestriction } from "./geofence-manager";
 
 export default async function AdminGeofencesPage() {
   const { supabase, role } = await requirePageRole(["admin", "reviewer"]);
-  const [{ data: fences }, { data: events }, { data: restrictions }] = await Promise.all([
+  const [{ data: fences }, { data: events }, { data: restrictions }, overview] = await Promise.all([
     supabase.from("geofences_geojson").select("*").order("submitted_at", { ascending: false }).limit(500),
     role === "admin"
       ? supabase
@@ -16,6 +18,7 @@ export default async function AdminGeofencesPage() {
           .limit(300)
       : Promise.resolve({ data: [] }),
     role === "admin" ? supabase.from("legal_restrictions").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
+    role === "admin" ? loadGeofenceOverview().catch(() => null) : Promise.resolve(null),
   ]);
   return (
     <div>
@@ -23,6 +26,7 @@ export default async function AdminGeofencesPage() {
         title="Geofences"
         description="Anonymous areas of concern appear here immediately. They are unverified expressions of concern, not legal restrictions."
       />
+      {overview && <GeofenceOverview rows={overview.rows} activity={overview.activity} />}
       <GeofenceManager
         isAdmin={role === "admin"}
         initialFences={(fences ?? []) as AdminFence[]}

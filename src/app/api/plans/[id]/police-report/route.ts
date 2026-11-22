@@ -6,6 +6,7 @@ import { looksAutomated } from "@/lib/geofence/submission";
 import { notifyAdmins } from "@/lib/notify";
 import { auditSystem } from "@/lib/audit";
 import { PLAN_REPORT_RULES } from "@/lib/plan-police";
+import { policeReportsEnabled } from "@/lib/police-reports";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ const body = z.object({
  */
 export const POST = handle(async (request: Request, ctx: { params: Promise<{ id: string }> }) => {
   const { id } = await ctx.params;
+  if (!(await policeReportsEnabled())) throw new HttpError(404, "Not found");
   if (!z.uuid().safeParse(id).success) throw new HttpError(404, "Plan not found");
   const input = await parseJson(request, body);
   if (looksAutomated(input.form_started_at, input.website)) return json({ ok: true }, { status: 201 });

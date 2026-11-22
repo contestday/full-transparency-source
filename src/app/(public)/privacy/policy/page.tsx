@@ -51,7 +51,7 @@ const STORED: [string, string][] = [
   ["A scrambled form of your IP address", "A salted one-way hash, used only to slow down abuse and, if needed, to block a sender who misuses the site. It cannot be turned back into your address."],
   ["The country you submitted from", "Two letters such as GB, as reported by our host for your request. Used only to spot and refuse misuse."],
   ["Your device's push address (only if you turn notifications on)", "An address issued by your browser's push service for this site. It does not contain your name, number or email."],
-  ["Report contacts (only if you add them)", "Email addresses you choose for automatic reports, e.g. a police contact. Each address gets nothing until its owner confirms, and every report has a stop link."],
+  ["Report contacts (only if you add them)", "Email addresses you choose for automatic reports, e.g. a solicitor. Each address gets nothing until its owner confirms, and every report has a stop link."],
 ];
 
 const NEVER: string[] = [
@@ -201,7 +201,7 @@ export default function PrivacyPolicyPage() {
 
         <Section icon="chat" title="Automatic reports to contacts you choose" summary="Optional. Emails, never phone calls, and only to addresses that confirm.">
           <p>
-            On your watch page you can add up to five email addresses, for example a police contact or a solicitor. Each address
+            On your watch page you can add up to five email addresses, for example a solicitor or someone you trust. Each address
             receives a confirmation email first and gets nothing more unless its owner confirms. After that, it receives a short,
             factual email each time the GPS record shows entry into one of your areas, with a link to stop at any time.
           </p>

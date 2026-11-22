@@ -1,3 +1,4 @@
+import { policeReportsEnabled } from "@/lib/police-reports";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicPlans } from "@/lib/public-data";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PlansSchedulePage({ searchParams }: PageProps<"/plans">) {
   const sp = await searchParams;
+  const police = await policeReportsEnabled();
   const category = str(sp.category);
   const status = str(sp.status);
   const showPast = sp.past === "1";
@@ -153,7 +155,7 @@ export default async function PlansSchedulePage({ searchParams }: PageProps<"/pl
               <h2 className="mb-3 text-lg font-bold">{fmtDate(`${day}T12:00:00Z`, { dateStyle: "full" })}</h2>
               <div className="space-y-3">
                 {items.map((p) => (
-                  <PlanCard key={p.id} p={p} zone={zoneOf.get(p.id) ?? null} />
+                  <PlanCard key={p.id} p={p} police={police} zone={zoneOf.get(p.id) ?? null} />
                 ))}
               </div>
             </section>

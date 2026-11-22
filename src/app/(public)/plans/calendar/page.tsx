@@ -1,3 +1,4 @@
+import { policeReportsEnabled } from "@/lib/police-reports";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicPlans, type PublicPlan } from "@/lib/public-data";
@@ -34,6 +35,7 @@ function plansByDay(plans: PublicPlan[]): Map<string, PublicPlan[]> {
 
 export default async function PlansCalendarPage({ searchParams }: PageProps<"/plans/calendar">) {
   const sp = await searchParams;
+  const police = await policeReportsEnabled();
   const category = str(sp.category);
   const status = str(sp.status);
   const view = sp.view === "week" ? "week" : "month";
@@ -175,7 +177,7 @@ export default async function PlansCalendarPage({ searchParams }: PageProps<"/pl
                     {items.map((p) => {
                       const q = planPoint(p);
                       return (
-                        <PlanCard key={p.id} p={p} zone={q ? publicZone(q, zctx) : null} />
+                        <PlanCard key={p.id} p={p} police={police} zone={q ? publicZone(q, zctx) : null} />
                       );
                     })}
                   </div>

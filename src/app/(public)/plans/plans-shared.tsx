@@ -129,7 +129,7 @@ export function planPoint(p: PublicPlan): { lat: number; lng: number } | null {
  * A plan, shaded by where it is (green / yellow / red for everyone). A
  * watcher whose own area it is sees their colour instead (one colour per card).
  */
-export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | null }) {
+export function PlanCard({ p, zone = null, police = false }: { p: PublicPlan; zone?: BaseZone | null; police?: boolean }) {
   const cancelled = p.status === "cancelled";
   const d = new Date(p.starts_at);
   const fmt = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", ...o }).format(d);
@@ -210,13 +210,13 @@ export function PlanCard({ p, zone = null }: { p: PublicPlan; zone?: BaseZone | 
           <p className="mt-2 text-xs text-muted">The place is kept private to protect the people there, not to hide the visit.</p>
         )}
         {!cancelled && p.status !== "completed" && <WishButtons planId={p.id} />}
-        <Link
+        {police && <Link
           href={`/plans/${p.id}/police`}
           prefetch={false}
           className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[var(--ft-radius-control)] border border-border bg-white px-3 text-sm font-semibold hover:bg-sky"
         >
           Report to police
-        </Link>
+        </Link>}
       </div>
      </div>
     </ZoneCard>

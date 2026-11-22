@@ -66,7 +66,7 @@ export function ReportContacts({ token }: { token: string }) {
         <Icon name="chat" className="text-accent" /> Automatic reports
       </h2>
       <p className="text-sm text-muted">
-        Choose who is emailed automatically when the GPS record shows entry into one of your areas: a police contact, a solicitor,
+        Choose who is emailed automatically when the GPS record shows entry into one of your areas: a solicitor, someone you trust,
         or anyone else. Each address must confirm before it receives anything, and every email has a stop link.
       </p>
 
@@ -97,7 +97,7 @@ export function ReportContacts({ token }: { token: string }) {
               id="report-email"
               type="email"
               required
-              placeholder="e.g. a police contact's email"
+              placeholder="e.g. a solicitor's email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="min-w-0 flex-1 sm:text-base!"
