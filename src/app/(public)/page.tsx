@@ -114,7 +114,7 @@ export default async function HomePage() {
               FAQs →
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
             <Tile href="/history" icon="history" title="History" text="Where I've been, on a map." footer="Updated every few minutes" />
             <Tile
               href="/plans"
@@ -124,10 +124,9 @@ export default async function HomePage() {
               footer={nextPlan ? `Next: ${fmtDate(nextPlan.starts_at, { dateStyle: undefined, weekday: "short", day: "numeric", month: "short" })}` : "Nothing planned yet"}
             />
             <Tile href="/geofences/submit" icon="pin" title="Watch" text="Get told if I go somewhere that matters to you." footer="Private, no account" dark />
+            <Tile href="/events" icon="target" title="Events" text="Mark a concert, a match or a few days in town." footer="Just for that time" />
             <Tile href="/sample" icon="layers" title="Sample" text="Try a watcher's view." footer="Read-only example" />
-            <div className="col-span-2 lg:col-span-1">
-              <Tile href="/report" icon="chat" title="Message" text="Message me anonymously. Only I read it." />
-            </div>
+            <Tile href="/report" icon="chat" title="Message" text="Message me anonymously. Only I read it." footer="No name needed" />
           </div>
         </section>
       </Container>
