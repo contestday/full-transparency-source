@@ -14,7 +14,7 @@ import { MENU, isCurrent, useLiveStatus, useStaff } from "@/components/site-head
 type Tab = { href: string; label: string; icon: IconName };
 
 /**
- * Phones: a bottom tab bar with the five main places and More (every other
+ * Phones: a bottom tab bar (Home, Your places, Your view or History, Events, Plans) and More (every other
  * page, Share and the live status, in a sheet). Hidden on large screens,
  * where the header shows the menu.
  */
@@ -44,16 +44,18 @@ export function BottomTabBar() {
     setMore(false);
   }, [pathname]);
 
-  // Watchers get "Your places" in place of "Watch".
+  // With a watch set up (a saved link with areas): Your places and Your view.
+  // Without one: Watch (the page for adding watch areas), and History in place of Your view.
+  const watching = watcher && hasAreas;
   const tabs: Tab[] = [
     { href: "/", label: "Home", icon: "home" },
-    { href: "/history", label: "History", icon: "history" },
-    { href: "/plans", label: "Plans", icon: "calendar" },
+    watching ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch", icon: "pin" },
+    watching ? { href: "/history/watched", label: "Your view", icon: "eye" } : { href: "/history", label: "History", icon: "history" },
     { href: "/events", label: "Events", icon: "target" },
-    watcher && hasAreas ? { href: "/watch", label: "Your places", icon: "layers" } : { href: "/geofences/submit", label: "Watch", icon: "pin" },
+    { href: "/plans", label: "Plans", icon: "calendar" },
   ];
   const inTabs = (href: string) => tabs.some((t) => t.href === href);
-  const moreItems = MENU.filter((m) => !inTabs(m.href) && (m.href !== "/history/watched" || watcher));
+  const moreItems = MENU.filter((m) => !inTabs(m.href) && (m.href !== "/history/watched" || watcher) && (m.href !== "/watch" || watching));
   const items = staff ? [...moreItems, { href: "/admin", label: "Admin", icon: "lock" as IconName }] : moreItems;
   const moreOn = items.some((m) => isCurrent(pathname, m.href));
   const chip = status && status !== "disabled" ? status : null;
@@ -62,7 +64,7 @@ export function BottomTabBar() {
     <>
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-white/95 px-1 pb-[calc(10px+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-white/95 px-0.5 pb-[calc(10px+env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden print:hidden"
       >
         {tabs.map((t) => {
           const on = isCurrent(pathname, t.href);
@@ -71,9 +73,9 @@ export function BottomTabBar() {
               key={t.href}
               href={t.href}
               aria-current={on ? "page" : undefined}
-              className={cn("flex flex-col items-center justify-center gap-0.5 whitespace-nowrap text-xs font-semibold", on ? "text-accent" : "text-muted")}
+              className={cn("flex min-w-0 flex-col items-center justify-center gap-0.5 whitespace-nowrap text-[11px] font-semibold tracking-[-0.025em]", on ? "text-accent" : "text-muted")}
             >
-              <span className={cn("flex h-[30px] w-12 items-center justify-center rounded-full", on && "bg-blue-100")}>
+              <span className={cn("flex h-[30px] w-11 items-center justify-center rounded-full", on && "bg-blue-100")}>
                 <Icon name={t.icon} />
               </span>
               {t.label}
@@ -84,9 +86,9 @@ export function BottomTabBar() {
           type="button"
           onClick={() => setMore(true)}
           aria-haspopup="dialog"
-          className={cn("flex flex-col items-center justify-center gap-0.5 text-xs font-semibold", moreOn ? "text-accent" : "text-muted")}
+          className={cn("flex min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold tracking-[-0.025em]", moreOn ? "text-accent" : "text-muted")}
         >
-          <span className={cn("flex h-[30px] w-12 items-center justify-center rounded-full", moreOn && "bg-blue-100")}>
+          <span className={cn("flex h-[30px] w-11 items-center justify-center rounded-full", moreOn && "bg-blue-100")}>
             <Icon name="menu" />
           </span>
           More
