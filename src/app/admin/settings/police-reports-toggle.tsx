@@ -6,7 +6,7 @@ import { Badge, Button, Card, Notice } from "@/components/ui";
 import { api } from "@/lib/client-api";
 
 /** Police reporting on or off. Switching on asks first; switching off doesn't. */
-export function PoliceReportsToggle({ initial }: { initial: boolean }) {
+export function PoliceReportsToggle({ initial, watchersOn }: { initial: boolean; watchersOn: number }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initial);
   const [asking, setAsking] = useState(false);
@@ -36,8 +36,13 @@ export function PoliceReportsToggle({ initial }: { initial: boolean }) {
       </div>
       <p className="text-sm text-muted">
         {enabled
-          ? "On: the Report to police pages and buttons show on plans and watch pages."
-          : "Off: every Report to police page and button is hidden from everyone."}
+          ? "On: each watcher can turn police reporting on for their own watch link. Only they then see Report to police (their areas, and plans on their device)."
+          : "Off: nobody can use police reporting, whatever they've chosen, and it isn't mentioned anywhere."}
+      </p>
+      <p className="text-sm">
+        <span className="text-2xl font-bold tabular-nums">{watchersOn}</span>{" "}
+        {watchersOn === 1 ? "watch link has" : "watch links have"} police reporting turned on
+        {!enabled && watchersOn > 0 ? " (not in use while this is off)" : ""}.
       </p>
       {error && <Notice tone="red">{error}</Notice>}
       {enabled ? (
@@ -46,7 +51,7 @@ export function PoliceReportsToggle({ initial }: { initial: boolean }) {
         </Button>
       ) : asking ? (
         <div className="space-y-2 rounded-md bg-red-50 p-3 text-sm text-red-900" role="alert">
-          <p>Turn police reporting on? Report to police buttons will show to everyone on plans and watch pages.</p>
+          <p>Turn police reporting on? Watchers will be able to turn it on for their own watch links. Nobody gets it unless they choose to.</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="danger" disabled={busy} onClick={() => set(true)}>
               Yes, turn it on

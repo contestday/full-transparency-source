@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PlanPoliceButton } from "./plan-police-button";
 import { Badge, Button, Select } from "@/components/ui";
 import { Icon, Segmented, type IconName } from "@/components/design";
 import { PLAN_CATEGORIES, PLAN_STATUSES, PRIVATE_LOCATION_LABEL, STATUS_LABELS, categoryLabel, type PlanStatus } from "@/lib/plans";
@@ -210,13 +210,7 @@ export function PlanCard({ p, zone = null, police = false }: { p: PublicPlan; zo
           <p className="mt-2 text-xs text-muted">The place is kept private to protect the people there, not to hide the visit.</p>
         )}
         {!cancelled && p.status !== "completed" && <WishButtons planId={p.id} />}
-        {police && <Link
-          href={`/plans/${p.id}/police`}
-          prefetch={false}
-          className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-[var(--ft-radius-control)] border border-border bg-white px-3 text-sm font-semibold hover:bg-sky"
-        >
-          Report to police
-        </Link>}
+        {police && <PlanPoliceButton planId={p.id} />}
       </div>
      </div>
     </ZoneCard>

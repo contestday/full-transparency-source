@@ -6,7 +6,8 @@ import { looksAutomated } from "@/lib/geofence/submission";
 import { notifyAdmins } from "@/lib/notify";
 import { auditSystem } from "@/lib/audit";
 import { PLAN_REPORT_RULES } from "@/lib/plan-police";
-import { policeReportsEnabled } from "@/lib/police-reports";
+import { policeReportsForWatcher } from "@/lib/police-reports";
+import { findWatcher } from "@/lib/watchers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ const body = z.object({
   named: z.boolean().default(false),
   form_started_at: z.number().int(),
   website: z.string().max(200).default(""),
+  /** The reporter's own watch link, which must have police reporting turned on. */
+  token: z.string().trim().max(40),
 });
 
 /**
@@ -26,9 +29,10 @@ const body = z.object({
  */
 export const POST = handle(async (request: Request, ctx: { params: Promise<{ id: string }> }) => {
   const { id } = await ctx.params;
-  if (!(await policeReportsEnabled())) throw new HttpError(404, "Not found");
   if (!z.uuid().safeParse(id).success) throw new HttpError(404, "Plan not found");
   const input = await parseJson(request, body);
+  const w = await findWatcher(input.token.toUpperCase());
+  if (!w || w.status !== "active" || !(await policeReportsForWatcher(w.id)).enabled) throw new HttpError(404, "Not found");
   if (looksAutomated(input.form_started_at, input.website)) return json({ ok: true }, { status: 201 });
 
   const supabase = createServiceClient();

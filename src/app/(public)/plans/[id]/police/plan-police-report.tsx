@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, Field, Input, Notice, Textarea } from "@/components/ui";
 import { api } from "@/lib/client-api";
 import { PLAN_REPORT_RULES, planReportText, type PlanFacts } from "@/lib/plan-police";
+import { usePoliceWatchToken } from "@/lib/police-client";
 
 interface Contact {
   label: string;
@@ -23,6 +24,20 @@ const callBtn =
  * was prepared (with their concern, never their name or contact).
  */
 export function PlanPoliceReport({ planId, facts, contact }: { planId: string; facts: PlanFacts; contact: Contact | null }) {
+  const token = usePoliceWatchToken();
+  if (token === undefined) return <p className="text-sm text-muted">Checking…</p>;
+  if (!token) {
+    return (
+      <Notice>
+        Reporting to the police is only available on a device with a watch link that has police reporting turned on. Open your watch
+        page and turn it on there first.
+      </Notice>
+    );
+  }
+  return <PlanPoliceReportForm planId={planId} facts={facts} contact={contact} token={token} />;
+}
+
+function PlanPoliceReportForm({ planId, facts, contact, token }: { planId: string; facts: PlanFacts; contact: Contact | null; token: string }) {
   const [concern, setConcern] = useState("");
   const [name, setName] = useState("");
   const [reach, setReach] = useState("");
@@ -42,7 +57,7 @@ export function PlanPoliceReport({ planId, facts, contact }: { planId: string; f
     setTold(true);
     await api(`/api/plans/${planId}/police-report`, {
       method: "POST",
-      json: { concern: concern.trim(), named: Boolean(name.trim()), form_started_at: startedAt, website },
+      json: { concern: concern.trim(), named: Boolean(name.trim()), form_started_at: startedAt, website, token },
     }).catch(() => setTold(false));
   }
 

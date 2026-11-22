@@ -23,3 +23,33 @@ export async function setPoliceReportsEnabled(enabled: boolean): Promise<void> {
     .upsert({ key: KEY, value: { enabled }, updated_at: new Date().toISOString() }, { onConflict: "key" });
   if (error) throw error;
 }
+
+/** Has this watcher turned police reporting on for their own watch link? */
+export async function watcherPoliceReports(watcherId: string): Promise<boolean> {
+  const { data } = await createServiceClient().from("watchers").select("police_reports").eq("id", watcherId).maybeSingle();
+  return (data as { police_reports?: boolean } | null)?.police_reports === true;
+}
+
+/** Police reporting for one watch link: available (my switch) and on for this watcher (theirs). Both must be true. */
+export async function policeReportsForWatcher(watcherId: string): Promise<{ available: boolean; enabled: boolean }> {
+  const available = await policeReportsEnabled();
+  return { available, enabled: available && (await watcherPoliceReports(watcherId)) };
+}
+
+export async function setWatcherPoliceReports(watcherId: string, enabled: boolean): Promise<void> {
+  const { error } = await createServiceClient()
+    .from("watchers")
+    .update({ police_reports: enabled, police_reports_at: new Date().toISOString() })
+    .eq("id", watcherId);
+  if (error) throw error;
+}
+
+/** How many active watch links have police reporting turned on. */
+export async function countWatcherPoliceReports(): Promise<number> {
+  const { count } = await createServiceClient()
+    .from("watchers")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active")
+    .eq("police_reports", true);
+  return count ?? 0;
+}

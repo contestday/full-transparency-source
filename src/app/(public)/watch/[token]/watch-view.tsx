@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { PoliceSetting } from "./police-setting";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LazyMap, type MapFeature } from "@/components/map-lazy";
@@ -589,6 +590,8 @@ In my home area: movement inside it is never shown.` });
                 )}
               </Button>
             </Card>
+
+            {view && !view.is_sample && <PoliceSetting token={token} />}
 
             <Card className="space-y-3 p-4 sm:p-6">
               <h2 className="flex items-center gap-2 text-xl font-bold">

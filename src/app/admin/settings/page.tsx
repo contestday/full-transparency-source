@@ -10,7 +10,7 @@ import { LiveMarkerSettings } from "./live-marker-settings";
 import { ContactAlertSettings } from "./contact-alert-settings";
 import { PasswordSettings } from "./password-settings";
 import { PoliceReportsToggle } from "./police-reports-toggle";
-import { policeReportsEnabled } from "@/lib/police-reports";
+import { countWatcherPoliceReports, policeReportsEnabled } from "@/lib/police-reports";
 import { emailConfigured, loadContactSettings } from "@/lib/incident-contacts";
 import type { LiveStatus } from "@/lib/live-status";
 
@@ -33,7 +33,7 @@ export default async function AdminSettingsPage({ searchParams }: PageProps<"/ad
   return (
     <div className="space-y-8">
       <PageHeader title="Settings" description="Integrations, privacy, publication and access." />
-      <PoliceReportsToggle initial={await policeReportsEnabled()} />
+      <PoliceReportsToggle initial={await policeReportsEnabled()} watchersOn={await countWatcherPoliceReports().catch(() => 0)} />
       {breached && <PasswordSettings breached />}
       <Card>
         <h2 className="mb-2 font-semibold">Integrations</h2>
