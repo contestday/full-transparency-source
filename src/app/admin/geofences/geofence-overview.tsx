@@ -9,23 +9,23 @@ function Dot({ hex }: { hex: string }) {
 /** Counts in place by colour (mine and others apart), then when each was added or removed. */
 export function GeofenceOverview({ rows, activity }: { rows: OverviewRow[]; activity: ActivityItem[] }) {
   const totalMine = rows.reduce((n, r) => n + (r.mine ?? 0), 0);
-  const totalOthers = rows.reduce((n, r) => n + r.others, 0);
+  const totalOthers = rows.reduce((n, r) => n + (r.others ?? 0), 0);
   return (
     <div className="mb-6 grid gap-4 lg:grid-cols-2">
       <Card className="p-5">
         <h2 className="mb-1 text-lg font-semibold">In place now</h2>
-        <p className="mb-3 text-xs text-muted">Areas, and events that are on now or coming up.</p>
+        <p className="mb-3 text-xs text-muted">Areas, and events that are on now or coming up. The public sample counts as mine.</p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-xs text-muted">
-              <th className="pb-2 font-medium">Colour</th>
+              <th className="pb-2 font-medium">Type</th>
               <th className="pb-2 text-right font-medium">Mine</th>
               <th className="pb-2 text-right font-medium">Others</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.colour} className="border-t border-border align-top">
+              <tr key={r.label} className="border-t border-border align-top">
                 <td className="py-2">
                   <span className="flex items-center gap-2 font-semibold">
                     <Dot hex={r.hex} /> {r.label}
@@ -36,7 +36,7 @@ export function GeofenceOverview({ rows, activity }: { rows: OverviewRow[]; acti
                   {r.mineNote && <span className="block text-xs text-muted">{r.mineNote}</span>}
                 </td>
                 <td className="py-2 text-right">
-                  <span className="text-base font-semibold tabular-nums">{r.others}</span>
+                  <span className="text-base font-semibold tabular-nums">{r.others ?? "–"}</span>
                   {r.othersNote && <span className="block text-xs text-muted">{r.othersNote}</span>}
                 </td>
               </tr>
