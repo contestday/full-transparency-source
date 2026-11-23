@@ -31,7 +31,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/full-transparency/pwa/icon-192.png",
-      badge: "/full-transparency/pwa/icon-192.png",
+      badge: "/full-transparency/pwa/badge-96.png",
       actions: Array.isArray(data.actions) ? data.actions : [],
       data: { url: data.url, stopUrl: data.stopUrl },
     }),
