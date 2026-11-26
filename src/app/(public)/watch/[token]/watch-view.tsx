@@ -23,6 +23,7 @@ import { eventFeatures, type EventView } from "@/components/event-card";
 import { restrictionFeatures, useRestrictions } from "@/components/restrictions";
 import { EVENT_COLOR, homeAssurance } from "@/lib/events/rules";
 import { YourEvents } from "@/app/(public)/events/your-events";
+import { WatchActivities } from "./watch-activities";
 import { EventForm } from "@/app/(public)/events/event-form";
 import { gridCellRing } from "@/lib/geo";
 import { fmtDateTime, fmtTime, londonDayKey, relativeAge } from "@/lib/format";
@@ -492,6 +493,9 @@ In my home area: movement inside it is never shown.` });
                 )}
               </Card>
             )}
+            <Card className="p-4 sm:p-6">
+              <WatchActivities token={token} sample={sample} />
+            </Card>
             <Card className="space-y-3 p-4 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-xl font-bold">My areas</h2>

@@ -5,6 +5,7 @@ import type { MapFeature } from "@/components/map-lazy";
 import type { EventView } from "@/components/event-card";
 import type { AreaGeometry } from "@/lib/geofence/area-geometry";
 import { PHASE_LABEL } from "@/lib/events/rules";
+import type { ActivityView } from "@/lib/activities";
 
 /** Red: where I mustn't go (shown to everyone). */
 export const RESTRICTION_COLOR = "#C62828";
@@ -13,6 +14,8 @@ export interface Restrictions {
   owner_first: string;
   areas: { reference: string; name: string; geojson: AreaGeometry }[];
   events: EventView[];
+  /** Activities I'm banned from, in force. */
+  activities?: ActivityView[];
 }
 
 let cache: Promise<Restrictions | null> | null = null;

@@ -7,6 +7,9 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { fmtDateTime } from "@/lib/format";
 import { AdminEventsMap, AdminEventsCalendar } from "./events-map";
 import { OwnerEvents } from "./owner-events";
+import { OwnerActivities } from "./owner-activities";
+import { ActivityList } from "@/components/activities";
+import { loadActivityOptions, loadAllActivities } from "@/lib/activities-server";
 import { EventCardBody, type EventView } from "@/components/event-card";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +17,9 @@ export const dynamic = "force-dynamic";
 /** Every watcher's events: upcoming, on now, and the record. Only I see these. */
 export default async function AdminEventsPage() {
   await requirePageRole(["admin"]);
-  const [all, owner] = await Promise.all([loadAllEvents(), loadOwnerProfile()]);
+  const [all, owner, allActivities, activityOptions] = await Promise.all([loadAllEvents(), loadOwnerProfile(), loadAllActivities(), loadActivityOptions()]);
+  const myActivities = allActivities.filter((a) => a.is_owner);
+  const theirActivities = allActivities.filter((a) => !a.is_owner);
   // Mine (public bans) are listed on their own; the rest are watchers' events.
   const mine = all.filter((e) => e.is_owner);
   const events = all.filter((e) => !e.is_owner);
@@ -57,9 +62,16 @@ export default async function AdminEventsPage() {
   );
   return (
     <div className="space-y-8">
-      <PageHeader title="Events" description="Events you're banned from (public, red), and places watchers would rather you weren't (black, only you and them)." />
+      <PageHeader title="Events" description="Events and activities you're banned from (public, red), and what watchers would rather you didn't do (black, only you and them)." />
       <p className="text-sm text-muted">{EVENTS_NOTE}</p>
       <OwnerEvents events={mine.map(view)} ownerFirst={owner.first} />
+      <OwnerActivities activities={myActivities} options={activityOptions} />
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">
+          Watchers&apos; activities <span className="text-muted">({theirActivities.filter((a) => a.status === "active").length})</span>
+        </h2>
+        <ActivityList items={theirActivities} empty="None yet." />
+      </section>
       <h2 className="pt-4 text-xl font-bold">Watchers&apos; events</h2>
       <AdminEventsMap events={[...on, ...upcoming].map(view)} />
       <AdminEventsCalendar events={[...events, ...mine].map(view)} />

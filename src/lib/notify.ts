@@ -22,6 +22,8 @@ export type NotificationEvent =
   | "watch_event_cancelled"
   | "watch_event_enter"
   | "watch_event_exit"
+  | "watch_activity_set"
+  | "watch_activity_ended"
   | "test";
 
 export interface NotificationMessage {

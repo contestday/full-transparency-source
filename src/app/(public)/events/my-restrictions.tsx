@@ -6,6 +6,7 @@ import { Card } from "@/components/ui";
 import { EventCardBody } from "@/components/event-card";
 import { EventsCalendar } from "@/components/events-calendar";
 import { RESTRICTION_COLOR, restrictionFeatures, useRestrictions } from "@/components/restrictions";
+import { ActivityList } from "@/components/activities";
 
 /**
  * Where I mustn't go, for everyone: the events I'm banned from and my own
@@ -23,9 +24,15 @@ export function MyRestrictions() {
         Where I mustn&apos;t go
       </h2>
       <p className="text-sm text-muted">
-        Events I&apos;m banned from, and my own restricted areas. Everyone can see these. If I&apos;m in one, the live marker shows red for everyone.
+        Events and activities I&apos;m banned from, and my own restricted areas. Everyone can see these. If I&apos;m in one, the live marker shows red for everyone.
       </p>
-      {!current.length && !r.areas.length && <p className="text-sm text-muted">Nothing at the moment.</p>}
+      {!current.length && !r.areas.length && !(r.activities ?? []).length && <p className="text-sm text-muted">Nothing at the moment.</p>}
+      {(r.activities ?? []).length > 0 && (
+        <Card className="space-y-2">
+          <p className="font-semibold">Activities I&apos;m banned from</p>
+          <ActivityList items={r.activities ?? []} />
+        </Card>
+      )}
       {features.length > 0 && <LazyMap features={features} fit className="h-64 w-full rounded-lg" ariaLabel="Where I mustn't go" />}
       {current.map((e) => (
         <Card key={e.reference} className="border-l-4" style={{ borderLeftColor: RESTRICTION_COLOR }}>

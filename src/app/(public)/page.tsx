@@ -9,6 +9,8 @@ import { loadSampleWatcher } from "@/lib/sample-watcher";
 import { loadHomeArea } from "@/lib/home";
 import { colourHistory, loadPublicZoneContext } from "@/lib/zones";
 import { shiftDay, weekStart } from "@/lib/history-range";
+import { loadOwnerActivities } from "@/lib/activities-server";
+import type { ActivityView } from "@/lib/activities";
 
 export const dynamic = "force-dynamic";
 
@@ -56,19 +58,22 @@ export default async function HomePage() {
   let live: PublicLiveStatus | null = null;
   let nextPlan: { title: string; starts_at: string } | null = null;
   let week: WeekDay[] | undefined;
+  let bans: ActivityView[] = [];
   const today = londonDayKey(new Date().toISOString());
   const sample = await loadSampleWatcher().catch(() => null);
   const sampleToken = sample?.locked ? sample.token : null;
   try {
-    const [l, plans, home_area, w] = await Promise.all([
+    const [l, plans, home_area, w, b] = await Promise.all([
       getPublicLiveStatus(),
       getPublicPlans({ from: `${new Date().toISOString().slice(0, 10)}T00:00:00Z` }),
       loadHomeArea().catch(() => null),
       loadWeek(today).catch(() => undefined),
+      loadOwnerActivities().catch(() => []),
     ]);
     live = { ...l, home_area };
     nextPlan = plans.find((p) => p.status !== "cancelled") ?? null;
     week = w;
+    bans = b;
   } catch (err) {
     console.error(err);
   }
@@ -106,6 +111,30 @@ export default async function HomePage() {
         </Link>
 
         <SampleAlertsPrompt sampleToken={sampleToken} />
+
+        {bans.length > 0 && (
+          <section aria-labelledby="home-bans" className="rounded-2xl border border-l-4 border-hairline border-l-[#C62828] bg-white p-4">
+            <div className="flex items-end justify-between gap-2">
+              <h2 id="home-bans" className="text-lg font-bold">
+                Activities I&apos;m banned from
+              </h2>
+              <Link href="/events" className="shrink-0 whitespace-nowrap text-sm font-semibold text-accent hover:underline">
+                All my bans →
+              </Link>
+            </div>
+            <ul className="mt-2 space-y-1 text-[15px]">
+              {bans.map((a) => (
+                <li key={a.reference} className="flex gap-2">
+                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#C62828]" aria-hidden="true" />
+                  <span>
+                    <span className="font-semibold">{a.label}</span>
+                    {a.details && <span className="text-muted"> · {a.details}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section className="space-y-3 pt-3">
           <div className="flex items-end justify-between gap-2">
